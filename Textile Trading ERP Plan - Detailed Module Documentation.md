@@ -141,23 +141,7 @@ There is currently no frontend app in this bench. The recommended layout is:
 │       │   ├── hooks.py
 │       │   ├── modules.txt
 │       │   └── ...
-├── frontend/
-│   ├── package.json
-│   ├── next.config.ts
-│   ├── tsconfig.json
-│   ├── src/
-│   │   ├── app/
-│   │   ├── components/
-│   │   ├── features/
-│   │   ├── lib/
-│   │   ├── services/
-│   │   ├── store/
-│   │   ├── styles/
-│   │   ├── types/
-│   │   └── utils/
-│   └── public/
-└── sites/
-```
+
 
 This keeps the frontend independent and makes the backend and frontend deployable as separate concerns.
 
