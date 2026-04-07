@@ -1,7 +1,8 @@
 "use client";
 
-import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
+import { createApi } from "@reduxjs/toolkit/query/react";
 
+import { axiosBaseQuery } from "@/lib/axiosBaseQuery";
 import type { FrappeListResponse, FrappeMessageResponse, SessionStatus } from "@/types/frappe";
 import type {
   ItemDocument,
@@ -57,16 +58,15 @@ export const frappeApi = createApi({
   reducerPath: "frappeApi",
   refetchOnFocus: true,
   refetchOnReconnect: true,
-  baseQuery: fetchBaseQuery({
+  baseQuery: axiosBaseQuery({
     baseUrl: "/api/frappe",
-    credentials: "include",
     prepareHeaders: (headers, { getState, endpoint, type }) => {
       const state = getState() as RootState;
       const csrfToken = state.session.csrfToken;
       const isWriteRequest = type === "mutation" || endpoint === "createItem" || endpoint === "updateItem";
 
       if (isWriteRequest && csrfToken) {
-        headers.set("x-frappe-csrf-token", csrfToken);
+        headers["x-frappe-csrf-token"] = csrfToken;
       }
 
       return headers;
@@ -112,7 +112,7 @@ export const frappeApi = createApi({
       query: (body) => ({
         url: "/resource/Item",
         method: "POST",
-        body
+        data: body
       }),
       transformResponse: (response: { data: ItemDocument }) => response.data,
       invalidatesTags: ["ItemList"]
@@ -121,7 +121,7 @@ export const frappeApi = createApi({
       query: ({ itemCode, values }) => ({
         url: `/resource/Item/${encodeURIComponent(itemCode)}`,
         method: "PUT",
-        body: values
+        data: values
       }),
       transformResponse: (response: { data: ItemDocument }) => response.data,
       invalidatesTags: (_result, _error, arg) => [

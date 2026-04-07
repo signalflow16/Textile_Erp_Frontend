@@ -1,3 +1,4 @@
+import axios from "axios";
 import { NextRequest, NextResponse } from "next/server";
 
 import { appEnv } from "@/lib/env";
@@ -13,63 +14,57 @@ const buildTargetUrl = (request: NextRequest, path: string[]) => {
 const forwardRequest = async (request: NextRequest, path: string[]) => {
   const url = buildTargetUrl(request, path);
   const contentType = request.headers.get("content-type");
-  const headers = new Headers();
+  const headers: Record<string, string> = {};
 
   const cookie = request.headers.get("cookie");
   if (cookie) {
-    headers.set("cookie", cookie);
+    headers.cookie = cookie;
   }
 
   const authorization = request.headers.get("authorization");
   if (authorization) {
-    headers.set("authorization", authorization);
+    headers.authorization = authorization;
   }
 
   if (contentType) {
-    headers.set("content-type", contentType);
+    headers["content-type"] = contentType;
   }
 
   const csrfToken = request.headers.get("x-frappe-csrf-token");
   if (csrfToken) {
-    headers.set("x-frappe-csrf-token", csrfToken);
+    headers["x-frappe-csrf-token"] = csrfToken;
   }
 
-  headers.set("accept", "application/json");
-
-  const init: RequestInit = {
-    method: request.method,
-    headers,
-    redirect: "manual",
-    cache: "no-store",
-    signal: AbortSignal.timeout(10000)
-  };
+  headers.accept = "application/json";
 
   try {
-    if (!["GET", "HEAD"].includes(request.method)) {
-      init.body = await request.text();
-    }
+    const requestBody = ["GET", "HEAD"].includes(request.method) ? undefined : await request.text();
 
-    const response = await fetch(url, init);
-    const body = await response.text();
-    const proxied = new NextResponse(body, {
+    const response = await axios.request<string>({
+      url: url.toString(),
+      method: request.method,
+      headers,
+      data: requestBody,
+      timeout: 10000,
+      maxRedirects: 0,
+      responseType: "text",
+      validateStatus: () => true
+    });
+
+    const proxied = new NextResponse(response.data, {
       status: response.status
     });
 
-    const responseContentType = response.headers.get("content-type");
+    const responseContentType = response.headers["content-type"];
     if (responseContentType) {
       proxied.headers.set("content-type", responseContentType);
     }
 
-    const setCookies =
-      (response.headers as Headers & { getSetCookie?: () => string[] }).getSetCookie?.() ?? [];
-
-    if (setCookies.length > 0) {
-      setCookies.forEach((value) => proxied.headers.append("set-cookie", value));
-    } else {
-      const setCookie = response.headers.get("set-cookie");
-      if (setCookie) {
-        proxied.headers.set("set-cookie", setCookie);
-      }
+    const setCookieHeader = response.headers["set-cookie"];
+    if (Array.isArray(setCookieHeader)) {
+      setCookieHeader.forEach((value) => proxied.headers.append("set-cookie", value));
+    } else if (setCookieHeader) {
+      proxied.headers.set("set-cookie", setCookieHeader);
     }
 
     return proxied;
@@ -77,7 +72,7 @@ const forwardRequest = async (request: NextRequest, path: string[]) => {
     const message =
       error instanceof Error ? error.message : "Unknown error while contacting ERPNext";
     const status =
-      error instanceof Error && error.name === "TimeoutError"
+      axios.isAxiosError(error) && error.code === "ECONNABORTED"
         ? 504
         : 503;
 

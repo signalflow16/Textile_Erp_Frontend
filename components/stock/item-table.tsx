@@ -1,28 +1,33 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Button, Checkbox, Select, Space, Table, Tag, Typography } from "antd";
-import { FilterOutlined } from "@ant-design/icons";
+import { Button, Checkbox, Input, Select, Space, Table, Tag, Typography } from "antd";
 import type { ColumnsType, TablePaginationConfig } from "antd/es/table";
 
 import type { ItemRow } from "@/types/item";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { useGetItemListQuery } from "@/store/api/frappeApi";
-import { setPage, setPageSize, setSortBy } from "@/store/features/items/itemsUiSlice";
+import { useGetItemListQuery, useGetItemLookupsQuery } from "@/store/api/frappeApi";
+import {
+  setHasVariants,
+  setItemCode,
+  setItemGroup,
+  setItemName,
+  setPage,
+  setPageSize,
+  setSortBy,
+  setVariantOf
+} from "@/store/features/items/itemsUiSlice";
 import { formatRelativeTime } from "@/components/stock/item-master-helpers";
-import { ItemFilters } from "@/components/stock/item-filters";
 
 const { Text } = Typography;
 
 export function ItemTable() {
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
   const dispatch = useAppDispatch();
   const filters = useAppSelector((state) => state.itemsUi);
+  const { data: lookups } = useGetItemLookupsQuery();
   const { data, isFetching } = useGetItemListQuery({
     page: filters.page,
     pageSize: filters.pageSize,
-    search: filters.search,
     itemCode: filters.itemCode,
     itemName: filters.itemName,
     itemGroup: filters.itemGroup,
@@ -131,29 +136,58 @@ export function ItemTable() {
 
   return (
     <div className="item-list-card">
+      <div className="item-quick-filters">
+        <Input
+          allowClear
+          placeholder="ID"
+          value={filters.itemCode}
+          onChange={(event) => dispatch(setItemCode(event.target.value))}
+        />
+        <Input
+          allowClear
+          placeholder="Item Name"
+          className="item-name-filter-input"
+          value={filters.itemName}
+          onChange={(event) => dispatch(setItemName(event.target.value))}
+        />
+        <Select
+          allowClear
+          placeholder="Item Group"
+          value={filters.itemGroup}
+          options={lookups?.item_groups ?? []}
+          onChange={(value) => dispatch(setItemGroup(value))}
+        />
+        <Checkbox
+          checked={filters.hasVariants === "1"}
+          onChange={(event) => dispatch(setHasVariants(event.target.checked ? "1" : "all"))}
+        >
+          Has Variants
+        </Checkbox>
+        <Input
+          allowClear
+          placeholder="Variant Of"
+          value={filters.variantOf}
+          onChange={(event) => dispatch(setVariantOf(event.target.value))}
+        />
+        <Select
+          size="middle"
+          value={filters.sortBy}
+          onChange={(value) => dispatch(setSortBy(value))}
+          options={[
+            { label: "Last Updated On", value: "modified_desc" },
+            { label: "Oldest Updated", value: "modified_asc" },
+            { label: "Item Code", value: "item_code_asc" },
+            { label: "Item Name", value: "item_name_asc" }
+          ]}
+          style={{ minWidth: 180 }}
+        />
+      </div>
       <div className="item-list-summary advanced">
         <Space>
           <Text type="secondary">{data?.total_count ?? 0} items</Text>
           <Tag bordered={false} color={activeFilterCount ? "processing" : "default"}>
             {activeFilterCount} active filters
           </Tag>
-        </Space>
-        <Space>
-          <Button icon={<FilterOutlined />} onClick={() => setIsFilterOpen(true)}>
-            Filter{activeFilterCount ? ` (${activeFilterCount})` : ""}
-          </Button>
-          <Select
-            size="middle"
-            value={filters.sortBy}
-            onChange={(value) => dispatch(setSortBy(value))}
-            options={[
-              { label: "Last Updated On", value: "modified_desc" },
-              { label: "Oldest Updated", value: "modified_asc" },
-              { label: "Item Code", value: "item_code_asc" },
-              { label: "Item Name", value: "item_name_asc" }
-            ]}
-            style={{ minWidth: 180 }}
-          />
         </Space>
       </div>
       <Table
@@ -171,7 +205,6 @@ export function ItemTable() {
         }}
         onChange={onTableChange}
       />
-      <ItemFilters open={isFilterOpen} onClose={() => setIsFilterOpen(false)} />
     </div>
   );
 }
