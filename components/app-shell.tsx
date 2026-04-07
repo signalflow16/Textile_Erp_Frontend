@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Button, Layout, Menu, Space, Tag, Typography } from "antd";
 import {
   AppstoreOutlined,
   DatabaseOutlined,
+  FileAddOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   ShopOutlined,
@@ -30,8 +32,11 @@ export function AppShell({
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  const selectedKey = pathname === "/stock/items/new" ? "stock-items-new" : "stock-items-list";
 
   return (
     <Layout className="app-layout">
@@ -54,14 +59,15 @@ export function AppShell({
           <Title level={4} className="brand-title">
             Textile ERP
           </Title>
-          <Text className="brand-copy">
+          {/* <Text className="brand-copy">
             React, Next.js, Ant Design, and ERPNext working together for operational workflows.
-          </Text>
+          </Text> */}
         </div>
         <Menu
           theme="light"
           mode="inline"
-          selectedKeys={["stock-items"]}
+          selectedKeys={[selectedKey]}
+          defaultOpenKeys={["item-master-menu"]}
           items={[
             {
               key: "stock-header",
@@ -69,9 +75,20 @@ export function AppShell({
               label: "Stock",
               children: [
                 {
-                  key: "stock-items",
+                  key: "item-master-menu",
                   icon: <DatabaseOutlined />,
-                  label: <Link href="/stock/items">Item Master</Link>
+                  label: "Item Master",
+                  children: [
+                    {
+                      key: "stock-items-list",
+                      label: <Link href="/stock/items">Item List</Link>
+                    },
+                    {
+                      key: "stock-items-new",
+                      icon: <FileAddOutlined />,
+                      label: <Link href="/stock/items/new">Create Item</Link>
+                    }
+                  ]
                 }
               ]
             },
