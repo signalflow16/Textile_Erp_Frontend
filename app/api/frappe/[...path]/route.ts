@@ -17,11 +17,13 @@ const forwardRequest = async (request: NextRequest, path: string[]) => {
   const headers: Record<string, string> = {};
 
   const cookie = request.headers.get("cookie");
-  if (cookie) {
+  const authorization = request.headers.get("authorization");
+
+  // Prefer standard ERPNext session authentication via forwarded cookies.
+  if (cookie && !authorization) {
     headers.cookie = cookie;
   }
 
-  const authorization = request.headers.get("authorization");
   if (authorization) {
     headers.authorization = authorization;
   }
@@ -45,7 +47,7 @@ const forwardRequest = async (request: NextRequest, path: string[]) => {
       method: request.method,
       headers,
       data: requestBody,
-      timeout: 10000,
+      timeout: 30000,
       maxRedirects: 0,
       responseType: "text",
       validateStatus: () => true

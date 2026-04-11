@@ -2,17 +2,24 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { Button, Layout, Menu, Space, Tag, Typography } from "antd";
 import {
   AppstoreOutlined,
   DatabaseOutlined,
   FileAddOutlined,
+  LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   ShopOutlined,
-  ShoppingCartOutlined
+  ShoppingCartOutlined,
+  TeamOutlined
 } from "@ant-design/icons";
+import { clearAuthTokens } from "@/lib/auth-storage";
+import { frappeApi, useLogoutUserMutation } from "@/store/api/frappeApi";
+import { clearAuth } from "@/store/features/auth/authSlice";
+import { setCsrfToken } from "@/store/features/session/sessionSlice";
+import { useAppDispatch } from "@/store/hooks";
 
 const { Header, Content, Sider } = Layout;
 const { Text, Title } = Typography;
@@ -32,11 +39,70 @@ export function AppShell({
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const pathname = usePathname();
+  const dispatch = useAppDispatch();
+  const [logoutUser, logoutState] = useLogoutUserMutation();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
 
-  const selectedKey = pathname === "/stock/items/new" ? "stock-items-new" : "stock-items-list";
+  const selectedKey = (() => {
+    if (pathname === "/initial-setup") {
+      return "admin-initial-setup-dashboard";
+    }
+
+    if (pathname.startsWith("/initial-setup/company")) {
+      return "admin-initial-setup-company";
+    }
+
+    if (pathname.startsWith("/initial-setup/warehouses")) {
+      return "admin-initial-setup-warehouses";
+    }
+
+    if (pathname.startsWith("/initial-setup/uoms")) {
+      return "admin-initial-setup-uoms";
+    }
+
+    if (pathname.startsWith("/initial-setup/item-groups")) {
+      return "admin-initial-setup-item-groups";
+    }
+
+    if (pathname.startsWith("/initial-setup/suppliers")) {
+      return "admin-initial-setup-suppliers";
+    }
+
+    if (pathname.startsWith("/initial-setup/customers")) {
+      return "admin-initial-setup-customers";
+    }
+
+    if (pathname.startsWith("/initial-setup")) {
+      return "admin-initial-setup-dashboard";
+    }
+
+    if (pathname.startsWith("/users")) {
+      return "admin-users";
+    }
+
+    if (pathname === "/stock/items/new") {
+      return "stock-items-new";
+    }
+
+    return "stock-items-list";
+  })();
+
+  const handleLogout = async () => {
+    try {
+      await logoutUser().unwrap();
+    } catch {
+      // Continue with local sign-out even when remote logout fails.
+    } finally {
+      clearAuthTokens();
+      dispatch(clearAuth());
+      dispatch(setCsrfToken(null));
+      dispatch(frappeApi.util.resetApiState());
+      router.replace("/signin");
+    }
+  };
 
   return (
     <Layout className="app-layout">
@@ -67,7 +133,7 @@ export function AppShell({
           theme="light"
           mode="inline"
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={["item-master-menu"]}
+          defaultOpenKeys={["item-master-menu", "initial-setup-menu"]}
           items={[
             {
               key: "stock-header",
@@ -89,6 +155,53 @@ export function AppShell({
                       label: <Link href="/stock/items/new">Create Item</Link>
                     }
                   ]
+                }
+              ]
+            },
+            {
+              key: "admin-header",
+              type: "group",
+              label: "Administration",
+              children: [
+                {
+                  key: "initial-setup-menu",
+                  icon: <DatabaseOutlined />,
+                  label: "Initial Setup",
+                  children: [
+                    {
+                      key: "admin-initial-setup-dashboard",
+                      label: <Link href="/initial-setup">Dashboard</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-company",
+                      label: <Link href="/initial-setup/company">Company</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-warehouses",
+                      label: <Link href="/initial-setup/warehouses">Warehouses</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-uoms",
+                      label: <Link href="/initial-setup/uoms">UOMs</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-item-groups",
+                      label: <Link href="/initial-setup/item-groups">Item Groups</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-suppliers",
+                      label: <Link href="/initial-setup/suppliers">Suppliers</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-customers",
+                      label: <Link href="/initial-setup/customers">Customers</Link>
+                    }
+                  ]
+                },
+                {
+                  key: "admin-users",
+                  icon: <TeamOutlined />,
+                  label: <Link href="/users">Users</Link>
                 }
               ]
             },
@@ -135,7 +248,17 @@ export function AppShell({
               {breadcrumb ? <div className="header-breadcrumb">{breadcrumb}</div> : null}
               {subtitle ? <div className="header-subtitle">{subtitle}</div> : null}
             </div>
-            {actions ? <div className="app-header-actions">{actions}</div> : null}
+            <div className="app-header-actions">
+              {actions}
+              <Button
+                danger
+                onClick={handleLogout}
+                icon={<LogoutOutlined />}
+                loading={logoutState.isLoading}
+              >
+                Logout
+              </Button>
+            </div>
           </div>
         </Header>
         {isMobile && !collapsed ? (
