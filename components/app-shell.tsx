@@ -1,18 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useRouter } from "next/navigation";
 import { Avatar, Button, Input, Layout, Menu, Typography } from "antd";
 import type { MenuProps } from "antd";
 import {
-  AntDesignOutlined,
-  BellOutlined,
-  AuditOutlined,
-  CalculatorOutlined,
+  AppstoreOutlined,
   DatabaseOutlined,
   FileAddOutlined,
   HomeOutlined,
+  LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   QuestionCircleOutlined,
@@ -20,156 +18,96 @@ import {
   SettingOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
+  TeamOutlined,
   SkinOutlined,
   TeamOutlined
 } from "@ant-design/icons";
+import { clearAuthTokens } from "@/lib/auth-storage";
+import { frappeApi, useLogoutUserMutation } from "@/store/api/frappeApi";
+import { clearAuth } from "@/store/features/auth/authSlice";
+import { setCsrfToken } from "@/store/features/session/sessionSlice";
+import { useAppDispatch } from "@/store/hooks";
 
 const { Header, Content, Sider } = Layout;
 const { Text, Title } = Typography;
 
-const futureModules = [
-  { key: "home", icon: <HomeOutlined />, label: "Home", href: "/home" },
-  { key: "accounting", icon: <CalculatorOutlined />, label: "Accounting", href: "/accounting" },
-  { key: "buying", icon: <ShoppingCartOutlined />, label: "Buying", href: "/buying" },
-  { key: "selling", icon: <ShopOutlined />, label: "Selling", href: "/selling" },
-  { key: "stock", icon: <DatabaseOutlined />, label: "Stock", href: "/stock" },
-  { key: "assets", icon: <SkinOutlined />, label: "Assets", href: "/assets" },
-  { key: "quality", icon: <AuditOutlined />, label: "Quality", href: "/quality" },
-  { key: "support", icon: <QuestionCircleOutlined />, label: "Support", href: "/support" },
-  { key: "users", icon: <TeamOutlined />, label: "Users", href: "/users" },
-  { key: "settings", icon: <SettingOutlined />, label: "ERPNext Settings", href: "/settings" }
-];
-
 export function AppShell({
+  section = "Stock",
   title,
   breadcrumb,
   subtitle,
   actions,
   children
 }: {
+  section?: string;
   title: string;
   breadcrumb?: string;
   subtitle?: string;
   actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
   const router = useRouter();
+  const pathname = usePathname();
+  const dispatch = useAppDispatch();
+  const [logoutUser, logoutState] = useLogoutUserMutation();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
-  const [moduleSearch, setModuleSearch] = useState("");
 
   const selectedKey = (() => {
-    const futureMatch = futureModules.find((module) => pathname === module.href || pathname.startsWith(`${module.href}/`));
-    if (futureMatch) {
-      return futureMatch.key;
+    if (pathname === "/initial-setup") {
+      return "admin-initial-setup-dashboard";
+    }
+
+    if (pathname.startsWith("/initial-setup/company")) {
+      return "admin-initial-setup-company";
+    }
+
+    if (pathname.startsWith("/initial-setup/warehouses")) {
+      return "admin-initial-setup-warehouses";
+    }
+
+    if (pathname.startsWith("/initial-setup/uoms")) {
+      return "admin-initial-setup-uoms";
+    }
+
+    if (pathname.startsWith("/initial-setup/item-groups")) {
+      return "admin-initial-setup-item-groups";
+    }
+
+    if (pathname.startsWith("/initial-setup/suppliers")) {
+      return "admin-initial-setup-suppliers";
+    }
+
+    if (pathname.startsWith("/initial-setup/customers")) {
+      return "admin-initial-setup-customers";
+    }
+
+    if (pathname.startsWith("/initial-setup")) {
+      return "admin-initial-setup-dashboard";
+    }
+
+    if (pathname.startsWith("/users")) {
+      return "admin-users";
     }
 
     if (pathname === "/stock/items/new") {
       return "stock-items-new";
     }
 
-    if (pathname === "/stock/item-groups" || pathname.startsWith("/stock/item-groups/")) {
-      return "stock-item-groups";
-    }
-
-    if (pathname === "/stock/items" || pathname.startsWith("/stock/items/")) {
-      return "stock-items-list";
-    }
-
-    return "home";
+    return "stock-items-list";
   })();
 
-  const navigableModules = [
-    { key: "home", label: "Home", href: "/home" },
-    { key: "stock-items-list", label: "Item List", href: "/stock/items" },
-    { key: "stock-items-new", label: "Create Item", href: "/stock/items/new" },
-    { key: "stock-item-groups", label: "Item Group", href: "/stock/item-groups" },
-    ...futureModules.map(({ key, label, href }) => ({ key, label, href }))
-  ];
-
-  const normalizedSearch = moduleSearch.trim().toLowerCase();
-
-  const menuItems = useMemo<MenuProps["items"]>(() => {
-    const stockChildren = [
-      {
-        key: "stock-items-list",
-        text: "Item List",
-        label: <Link href="/stock/items">Item List</Link>
-      },
-      {
-        key: "stock-items-new",
-        icon: <FileAddOutlined />,
-        text: "Create Item",
-        label: <Link href="/stock/items/new">Create Item</Link>
-      },
-      {
-        key: "stock-item-groups",
-        text: "Item Group",
-        label: <Link href="/stock/item-groups">Item Group</Link>
-      }
-    ];
-
-    if (!normalizedSearch) {
-      return futureModules.map((module) =>
-        module.key === "stock"
-          ? {
-              key: module.key,
-              icon: module.icon,
-              label: module.label,
-              children: stockChildren
-            }
-          : {
-              key: module.key,
-              icon: module.icon,
-              label: <Link href={module.href}>{module.label}</Link>
-            }
-      );
-    }
-
-    const filteredChildren = stockChildren.filter((item) =>
-      item.text.toLowerCase().includes(normalizedSearch)
-    );
-
-    const filteredItems: NonNullable<MenuProps["items"]> = [];
-
-    futureModules.forEach((module) => {
-      if (module.key === "stock") {
-        if ("stock".includes(normalizedSearch) || filteredChildren.length > 0) {
-          filteredItems.push({
-            key: module.key,
-            icon: module.icon,
-            label: module.label,
-            children: filteredChildren.length > 0 ? filteredChildren : stockChildren
-          });
-        }
-        return;
-      }
-
-      if (module.label.toLowerCase().includes(normalizedSearch)) {
-        filteredItems.push({
-          key: module.key,
-          icon: module.icon,
-          label: <Link href={module.href}>{module.label}</Link>
-        });
-      }
-    });
-
-    return filteredItems;
-  }, [normalizedSearch]);
-
-  const triggerModuleSearch = () => {
-    if (!normalizedSearch) {
-      return;
-    }
-
-    const match = navigableModules.find((module) =>
-      module.label.toLowerCase().includes(normalizedSearch)
-    );
-
-    if (match) {
-      router.push(match.href);
-      setModuleSearch("");
+  const handleLogout = async () => {
+    try {
+      await logoutUser().unwrap();
+    } catch {
+      // Continue with local sign-out even when remote logout fails.
+    } finally {
+      clearAuthTokens();
+      dispatch(clearAuth());
+      dispatch(setCsrfToken(null));
+      dispatch(frappeApi.util.resetApiState());
+      router.replace("/signin");
     }
   };
 
@@ -205,55 +143,132 @@ export function AppShell({
           theme="light"
           mode="inline"
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={["stock"]}
-          inlineCollapsed={collapsed && !isMobile}
-          items={menuItems}
+          defaultOpenKeys={["item-master-menu", "initial-setup-menu"]}
+          items={[
+            {
+              key: "stock-header",
+              type: "group",
+              label: "Stock",
+              children: [
+                {
+                  key: "item-master-menu",
+                  icon: <DatabaseOutlined />,
+                  label: "Item Master",
+                  children: [
+                    {
+                      key: "stock-items-list",
+                      label: <Link href="/stock/items">Item List</Link>
+                    },
+                    {
+                      key: "stock-items-new",
+                      icon: <FileAddOutlined />,
+                      label: <Link href="/stock/items/new">Create Item</Link>
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              key: "admin-header",
+              type: "group",
+              label: "Administration",
+              children: [
+                {
+                  key: "initial-setup-menu",
+                  icon: <DatabaseOutlined />,
+                  label: "Initial Setup",
+                  children: [
+                    {
+                      key: "admin-initial-setup-dashboard",
+                      label: <Link href="/initial-setup">Dashboard</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-company",
+                      label: <Link href="/initial-setup/company">Company</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-warehouses",
+                      label: <Link href="/initial-setup/warehouses">Warehouses</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-uoms",
+                      label: <Link href="/initial-setup/uoms">UOMs</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-item-groups",
+                      label: <Link href="/initial-setup/item-groups">Item Groups</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-suppliers",
+                      label: <Link href="/initial-setup/suppliers">Suppliers</Link>
+                    },
+                    {
+                      key: "admin-initial-setup-customers",
+                      label: <Link href="/initial-setup/customers">Customers</Link>
+                    }
+                  ]
+                },
+                {
+                  key: "admin-users",
+                  icon: <TeamOutlined />,
+                  label: <Link href="/users">Users</Link>
+                }
+              ]
+            },
+            {
+              key: "future-header",
+              type: "group",
+              label: "Planned Modules",
+              children: [
+                {
+                  key: "warehouse",
+                  icon: <ShopOutlined />,
+                  label: "Warehouse"
+                },
+                {
+                  key: "purchase",
+                  icon: <ShoppingCartOutlined />,
+                  label: "Purchase"
+                },
+                {
+                  key: "sales",
+                  icon: <AppstoreOutlined />,
+                  label: "Sales"
+                }
+              ]
+            }
+          ]}
         />
       </Sider>
       <Layout>
         <Header className="app-header">
-          <div className="top-nav">
-            <div className="top-nav-left">
-              <Button
-                type="text"
-                size="large"
-                className="sidebar-toggle-btn"
-                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                onClick={() => setCollapsed((prev) => !prev)}
-              />
-              <div className="top-nav-title">
-                <Text className="header-title">{title}</Text>
-                {breadcrumb ? <div className="header-breadcrumb">{breadcrumb}</div> : null}
-              </div>
-            </div>
-            <div className="top-nav-right">
-              <div className="top-nav-search-group">
-                <Input
-                  className="top-nav-search"
-                  prefix={<SearchOutlined />}
-                  placeholder="Search modules"
-                  value={moduleSearch}
-                  onChange={(event) => setModuleSearch(event.target.value)}
-                  onPressEnter={triggerModuleSearch}
-                />
-                <Button
-                  className="top-nav-search-button"
-                  icon={<SearchOutlined />}
-                  onClick={triggerModuleSearch}
-                />
-              </div>
-              <Button type="text" className="top-nav-icon" icon={<BellOutlined />} />
-              <Button type="text" className="top-nav-help">
-                Help
-              </Button>
-              <Avatar className="top-nav-avatar">A</Avatar>
-            </div>
-          </div>
           <div className="app-header-main">
             <div>
+              <Space size="small" align="center">
+                <Button
+                  type="text"
+                  size="large"
+                  className="sidebar-toggle-btn"
+                  icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => setCollapsed((prev) => !prev)}
+                />
+                <Tag color="blue">{section}</Tag>
+                <Text className="header-title">{title}</Text>
+              </Space>
+              {breadcrumb ? <div className="header-breadcrumb">{breadcrumb}</div> : null}
               {subtitle ? <div className="header-subtitle">{subtitle}</div> : null}
             </div>
-            {actions ? <div className="app-header-actions">{actions}</div> : null}
+            <div className="app-header-actions">
+              {actions}
+              <Button
+                danger
+                onClick={handleLogout}
+                icon={<LogoutOutlined />}
+                loading={logoutState.isLoading}
+              >
+                Logout
+              </Button>
+            </div>
           </div>
         </Header>
         {isMobile && !collapsed ? (

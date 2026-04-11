@@ -223,6 +223,24 @@ a {
   padding: 24px;
 }
 
+.auth-screen {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(37, 99, 235, 0.14), transparent 40%),
+    radial-gradient(circle at 85% 10%, rgba(14, 165, 233, 0.16), transparent 42%),
+    linear-gradient(155deg, #f8fbff 0%, #f3f7ff 46%, #eef4ff 100%);
+}
+
+.auth-card.ant-card {
+  width: min(100%, 460px);
+  border-radius: 18px !important;
+  border: 1px solid #dbe6f8 !important;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+}
+
 .filter-card,
 .ant-card {
   border-radius: 14px !important;
@@ -653,6 +671,52 @@ a {
   text-align: right;
 }
 
+.user-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.setup-form-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.setup-form-grid-uom {
+  display: grid;
+  grid-template-columns: 1fr 220px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.setup-form-grid-supplier {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.setup-nested-card.ant-card {
+  border-style: dashed;
+  margin-top: 6px;
+}
+
+.setup-json-preview {
+  margin: 0;
+  width: 100%;
+  overflow: auto;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 10px;
+  background: #f8fafc;
+  font-size: 12px;
+}
+
 @keyframes subtle-enter {
   from {
     opacity: 0;
@@ -867,6 +931,22 @@ a {
   .item-group-drawer-actions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .user-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-form-grid-uom {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-form-grid-supplier {
+    grid-template-columns: 1fr;
   }
 
   .filter-actions {

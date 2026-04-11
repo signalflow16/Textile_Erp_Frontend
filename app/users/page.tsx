@@ -1,10 +1,33 @@
+"use client";
+
 import { AppShell } from "@/components/app-shell";
-import { UnderDevelopmentPage } from "@/components/under-development-page";
+import { RoleManagement } from "@/components/users/role-management";
+import { UserManagement } from "@/components/users/user-management";
+import { Tabs } from "antd";
 
 export default function UsersPage() {
   return (
-    <AppShell title="Users" breadcrumb="Users">
-      <UnderDevelopmentPage />
+    <AppShell
+      section="Administration"
+      title="Users"
+      breadcrumb="Administration > Users"
+      subtitle="Owners can create manager accounts. Managers can create staff users like Cashier and Accountant."
+    >
+      <Tabs
+        defaultActiveKey="users"
+        items={[
+          {
+            key: "users",
+            label: "Users",
+            children: <UserManagement />
+          },
+          {
+            key: "roles",
+            label: "Role Management",
+            children: <RoleManagement />
+          }
+        ]}
+      />
     </AppShell>
   );
 }
