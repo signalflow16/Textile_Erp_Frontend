@@ -5,12 +5,11 @@ import { ItemTable } from "@/components/stock/item-table";
 export default function ItemsPage() {
   return (
     <AppShell
-      title="Item Master"
-      breadcrumb="Stock > Item"
-      subtitle="Manage stock items, templates, and variants from a single operational screen."
-      actions={<ItemMasterToolbar />}
+      title="Stock"
+      breadcrumb="Stock"
     >
       <div className="page-stack">
+        <ItemMasterToolbar />
         <ItemTable />
       </div>
     </AppShell>

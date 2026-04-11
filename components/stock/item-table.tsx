@@ -8,13 +8,15 @@ import type { ItemRow } from "@/types/item";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { useGetItemListQuery, useGetItemLookupsQuery } from "@/store/api/frappeApi";
 import {
+  setDisabled,
+  setSearch,
   setHasVariants,
   setItemCode,
   setItemGroup,
   setItemName,
   setPage,
   setPageSize,
-  setSortBy,
+  setSort,
   setVariantOf
 } from "@/store/features/items/itemsUiSlice";
 import { formatRelativeTime } from "@/components/stock/item-master-helpers";
@@ -28,13 +30,15 @@ export function ItemTable() {
   const { data, isFetching } = useGetItemListQuery({
     page: filters.page,
     pageSize: filters.pageSize,
+    search: filters.search,
     itemCode: filters.itemCode,
     itemName: filters.itemName,
     itemGroup: filters.itemGroup,
     variantOf: filters.variantOf,
     hasVariants: filters.hasVariants,
     disabled: filters.disabled,
-    sortBy: filters.sortBy
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortOrder
   });
 
   const columns: ColumnsType<ItemRow> = [
@@ -118,6 +122,7 @@ export function ItemTable() {
   const activeFilterCount = [
     filters.itemCode,
     filters.itemName,
+    filters.search,
     filters.itemGroup,
     filters.variantOf,
     filters.hasVariants !== "all" ? filters.hasVariants : "",
@@ -137,6 +142,12 @@ export function ItemTable() {
   return (
     <div className="item-list-card">
       <div className="item-quick-filters">
+        <Input
+          allowClear
+          placeholder="Search"
+          value={filters.search}
+          onChange={(event) => dispatch(setSearch(event.target.value))}
+        />
         <Input
           allowClear
           placeholder="ID"
@@ -171,13 +182,27 @@ export function ItemTable() {
         />
         <Select
           size="middle"
-          value={filters.sortBy}
-          onChange={(value) => dispatch(setSortBy(value))}
+          value={filters.disabled}
+          onChange={(value) => dispatch(setDisabled(value))}
+          options={[
+            { label: "Status: All", value: "all" },
+            { label: "Enabled", value: "0" },
+            { label: "Disabled", value: "1" }
+          ]}
+          style={{ minWidth: 140 }}
+        />
+        <Select
+          size="middle"
+          value={`${filters.sortBy}_${filters.sortOrder}`}
+          onChange={(value) => {
+            const [sortBy, sortOrder] = value.split("_") as ["modified" | "item_code" | "item_name", "asc" | "desc"];
+            dispatch(setSort({ sortBy, sortOrder }));
+          }}
           options={[
             { label: "Last Updated On", value: "modified_desc" },
             { label: "Oldest Updated", value: "modified_asc" },
-            { label: "Item Code", value: "item_code_asc" },
-            { label: "Item Name", value: "item_name_asc" }
+            { label: "Item Code A-Z", value: "item_code_asc" },
+            { label: "Item Name A-Z", value: "item_name_asc" }
           ]}
           style={{ minWidth: 180 }}
         />

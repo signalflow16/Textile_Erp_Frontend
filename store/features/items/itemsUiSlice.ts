@@ -4,7 +4,8 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 type DisabledFilter = "all" | "0" | "1";
 type HasVariantsFilter = "all" | "0" | "1";
-type ItemSort = "modified_desc" | "modified_asc" | "item_code_asc" | "item_name_asc";
+type ItemSortBy = "modified" | "item_code" | "item_name";
+type ItemSortOrder = "asc" | "desc";
 
 export type ItemsUiState = {
   search: string;
@@ -14,7 +15,8 @@ export type ItemsUiState = {
   variantOf: string;
   hasVariants: HasVariantsFilter;
   disabled: DisabledFilter;
-  sortBy: ItemSort;
+  sortBy: ItemSortBy;
+  sortOrder: ItemSortOrder;
   page: number;
   pageSize: number;
 };
@@ -27,7 +29,8 @@ const initialState: ItemsUiState = {
   variantOf: "",
   hasVariants: "all",
   disabled: "all",
-  sortBy: "modified_desc",
+  sortBy: "modified",
+  sortOrder: "desc",
   page: 1,
   pageSize: 20
 };
@@ -64,8 +67,9 @@ const itemsUiSlice = createSlice({
       state.disabled = action.payload;
       state.page = 1;
     },
-    setSortBy(state, action: PayloadAction<ItemSort>) {
-      state.sortBy = action.payload;
+    setSort(state, action: PayloadAction<{ sortBy: ItemSortBy; sortOrder: ItemSortOrder }>) {
+      state.sortBy = action.payload.sortBy;
+      state.sortOrder = action.payload.sortOrder;
       state.page = 1;
     },
     setPage(state, action: PayloadAction<number>) {
@@ -91,7 +95,7 @@ export const {
   setPage,
   setPageSize,
   setSearch,
-  setSortBy,
+  setSort,
   setVariantOf
 } = itemsUiSlice.actions;
 

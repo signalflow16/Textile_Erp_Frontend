@@ -11,6 +11,7 @@ export type ItemFormValues = {
   is_stock_item: boolean;
   has_variants: boolean;
   variant_of?: string;
+  image?: string;
   standard_rate?: number;
   description?: string;
   brand?: string;
@@ -55,6 +56,10 @@ export type ItemFormValues = {
     minimum_net_rate?: number;
     maximum_net_rate?: number;
   }[];
+  attributes?: {
+    attribute: string;
+    attribute_value?: string;
+  }[];
 };
 
 const clean = (value?: string) => {
@@ -72,6 +77,7 @@ export const normalizeItemPayload = (values: ItemFormValues): ItemDocument => {
     is_stock_item: values.is_stock_item ? 1 : 0,
     has_variants: values.has_variants ? 1 : 0,
     variant_of: clean(values.variant_of),
+    image: clean(values.image),
     standard_rate: values.standard_rate,
     description: clean(values.description),
     brand: clean(values.brand),
@@ -131,6 +137,13 @@ export const normalizeItemPayload = (values: ItemFormValues): ItemDocument => {
           valid_from: clean(row.valid_from),
           minimum_net_rate: row.minimum_net_rate,
           maximum_net_rate: row.maximum_net_rate
+        })) ?? [],
+    attributes:
+      values.attributes
+        ?.filter((row) => row.attribute?.trim())
+        .map((row) => ({
+          attribute: row.attribute.trim(),
+          attribute_value: clean(row.attribute_value)
         })) ?? []
   };
 

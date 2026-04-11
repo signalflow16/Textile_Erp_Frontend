@@ -1,10 +1,13 @@
 "use client";
 
-import { PlusOutlined, RedoOutlined, UnorderedListOutlined } from "@ant-design/icons";
-import { Button, Segmented, Space } from "antd";
+import Link from "next/link";
+import { PlusOutlined, ReloadOutlined } from "@ant-design/icons";
+import { Button, Space, Typography } from "antd";
 
 import { frappeApi } from "@/store/api/frappeApi";
 import { useAppDispatch } from "@/store/hooks";
+
+const { Text } = Typography;
 
 export function ItemMasterToolbar() {
   const dispatch = useAppDispatch();
@@ -15,33 +18,26 @@ export function ItemMasterToolbar() {
 
   return (
     <div className="item-toolbar">
-      <div className="item-toolbar-left">
-        <Segmented
-          value="list"
-          options={[
-            {
-              label: (
-                <Space size={6}>
-                  <UnorderedListOutlined />
-                  <span>List View</span>
-                </Space>
-              ),
-              value: "list"
-            }
-          ]}
-        />
+      <div className="item-toolbar-copy">
+        <Text className="item-toolbar-title">Stock</Text>
+        <Text className="item-toolbar-subtitle">
+          Manage stock items, templates, and variants from a single operational screen.
+        </Text>
       </div>
       <Space size="middle">
         <Button
           size="middle"
-          type="text"
-          aria-label="Refresh items"
-          icon={<RedoOutlined />}
+          icon={<ReloadOutlined />}
+          className="item-toolbar-refresh"
           onClick={onRefresh}
-        />
-        <Button type="primary" size="middle" icon={<PlusOutlined />} href="/stock/items/new">
-          Add Item
+        >
+          Refresh
         </Button>
+        <Link href="/stock/items/new">
+          <Button type="primary" size="middle" icon={<PlusOutlined />} className="item-toolbar-primary">
+            Add Item
+          </Button>
+        </Link>
       </Space>
     </div>
   );

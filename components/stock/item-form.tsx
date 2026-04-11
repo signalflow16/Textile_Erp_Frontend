@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useEffect } from "react";
+import { useMemo, useEffect, type Key } from "react";
 import { useRouter } from "next/navigation";
 import {
   App,
+  Alert,
   Button,
   Card,
   Checkbox,
@@ -20,7 +21,13 @@ import {
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 
 import type { ItemDocument } from "@/types/item";
-import { useCreateItemMutation, useGetItemLookupsQuery, useUpdateItemMutation } from "@/store/api/frappeApi";
+import {
+  useCreateItemMutation,
+  useGetItemLookupsQuery,
+  useGetItemPriceSummaryQuery,
+  useGetItemVariantAttributeLookupsQuery,
+  useUpdateItemMutation
+} from "@/store/api/frappeApi";
 import { getErrorMessage, normalizeItemPayload, type ItemFormValues } from "@/components/stock/item-master-helpers";
 
 const { Text, Title } = Typography;
@@ -49,6 +56,11 @@ const initialFormValues: Partial<ItemFormValues> = {
   taxes: []
 };
 
+const getFormListItemProps = <T extends { key: Key }>(field: T): Omit<T, "key"> => {
+  const { key: _key, ...itemProps } = field;
+  return itemProps;
+};
+
 export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
   const [form] = Form.useForm<ItemFormValues>();
   const router = useRouter();
@@ -67,6 +79,7 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
       is_stock_item: initialValues?.is_stock_item !== 0,
       has_variants: Boolean(initialValues?.has_variants),
       variant_of: initialValues?.variant_of ?? "",
+      image: initialValues?.image ?? "",
       standard_rate: initialValues?.standard_rate,
       description: initialValues?.description ?? "",
       brand: initialValues?.brand,
@@ -120,12 +133,42 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
           valid_from: entry.valid_from,
           minimum_net_rate: entry.minimum_net_rate,
           maximum_net_rate: entry.maximum_net_rate
+        })) ?? [],
+      attributes:
+        initialValues?.attributes?.map((entry) => ({
+          attribute: entry.attribute,
+          attribute_value: entry.attribute_value
         })) ?? []
     });
   }, [form, initialValues, itemCode]);
 
+  const saving = createState.isLoading || updateState.isLoading;
+  const variantMode = Form.useWatch("has_variants", form);
+  const variantParent = Form.useWatch("variant_of", form);
+  const imageValue = Form.useWatch("image", form);
+  const templateItemCode =
+    mode === "edit"
+      ? initialValues?.has_variants
+        ? itemCode
+        : undefined
+      : variantMode
+        ? form.getFieldValue("item_code")
+        : undefined;
+  const { data: variantLookups } = useGetItemVariantAttributeLookupsQuery(templateItemCode, {
+    skip: !templateItemCode
+  });
+  const { data: priceSummary } = useGetItemPriceSummaryQuery(itemCode ?? "", {
+    skip: mode !== "edit" || !itemCode
+  });
+
   const onFinish = async (values: ItemFormValues) => {
     try {
+      const barcodeValues = values.barcodes?.map((row) => row.barcode?.trim()).filter(Boolean) ?? [];
+      if (new Set(barcodeValues).size !== barcodeValues.length) {
+        message.error("Duplicate barcode values are not allowed.");
+        return;
+      }
+
       if (values.has_variants && values.variant_of?.trim()) {
         message.error("Template item cannot be marked as Variant Of another item.");
         return;
@@ -152,8 +195,6 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
       message.error(getErrorMessage(error, fallback));
     }
   };
-
-  const saving = createState.isLoading || updateState.isLoading;
 
   const moduleTabs = useMemo(
     () => [
@@ -230,27 +271,62 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
             </Col>
             <Col xs={24} md={8}>
               <Form.Item label="Collection" name="collection">
-                <Input size="large" />
+                <Select
+                  allowClear
+                  size="large"
+                  loading={lookupsLoading}
+                  options={lookups?.collections ?? []}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
               <Form.Item label="Season" name="season">
-                <Input size="large" />
+                <Select
+                  allowClear
+                  size="large"
+                  loading={lookupsLoading}
+                  options={lookups?.seasons ?? []}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
               <Form.Item label="Fabric Type" name="fabric_type">
-                <Input size="large" />
+                <Select
+                  allowClear
+                  size="large"
+                  loading={lookupsLoading}
+                  options={lookups?.fabric_types ?? []}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
               <Form.Item label="Display Category" name="display_category">
-                <Input size="large" />
+                <Select
+                  allowClear
+                  size="large"
+                  loading={lookupsLoading}
+                  options={lookups?.display_categories ?? []}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
               <Form.Item label="Primary Store" name="primary_store">
-                <Input size="large" />
+                <Select
+                  allowClear
+                  size="large"
+                  loading={lookupsLoading}
+                  options={lookups?.warehouses ?? []}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={8}>
@@ -260,9 +336,50 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
             </Col>
             <Col xs={24} md={16}>
               <Form.Item label="Variant Of" name="variant_of">
-                <Input size="large" />
+                <Select
+                  allowClear
+                  size="large"
+                  disabled={Boolean(variantMode)}
+                  loading={lookupsLoading}
+                  options={lookups?.variant_parent_candidates ?? []}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </Col>
+            <Col xs={24} md={8}>
+              <Form.Item
+                label="Image"
+                name="image"
+                rules={[
+                  {
+                    validator: async (_rule, value?: string) => {
+                      if (!value?.trim()) {
+                        return;
+                      }
+
+                      if (!/\.(png|jpe?g|gif|webp|svg)$/i.test(value.trim())) {
+                        throw new Error("Use a supported image path or URL.");
+                      }
+                    }
+                  }
+                ]}
+              >
+                <Input size="large" placeholder="Image URL or ERPNext file path" />
+              </Form.Item>
+            </Col>
+            {imageValue ? (
+              <Col xs={24}>
+                <Card size="small" title="Image Preview" extra={<Button type="link" onClick={() => form.setFieldValue("image", "")}>Remove</Button>}>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    alt="Item preview"
+                    src={imageValue}
+                    style={{ maxWidth: 220, maxHeight: 220, objectFit: "contain" }}
+                  />
+                </Card>
+              </Col>
+            ) : null}
             <Col xs={24} md={8}>
               <Form.Item name="disabled" valuePropName="checked">
                 <Checkbox>Disabled</Checkbox>
@@ -289,6 +406,72 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
                 <Input.TextArea rows={4} />
               </Form.Item>
             </Col>
+            {variantMode ? (
+              <Col xs={24}>
+                <Title level={5}>Variant Attributes</Title>
+                <Form.List name="attributes">
+                  {(fields, { add, remove }) => (
+                    <Space direction="vertical" size={12} style={{ width: "100%" }}>
+                      {fields.map((field) => {
+                        const itemProps = getFormListItemProps(field);
+                        const attributeName = form.getFieldValue(["attributes", field.name, "attribute"]);
+                        const valueOptions =
+                          variantLookups?.item_attributes?.find((attribute) => attribute.value === attributeName)?.values ??
+                          lookups?.item_attributes?.find((attribute) => attribute.value === attributeName)?.values ??
+                          [];
+
+                        return (
+                          <Row gutter={12} key={field.key}>
+                            <Col xs={24} md={10}>
+                              <Form.Item
+                                {...itemProps}
+                                label={field.name === 0 ? "Attribute" : ""}
+                                name={[field.name, "attribute"]}
+                                rules={[{ required: true, message: "Attribute is required." }]}
+                              >
+                                <Select options={lookups?.item_attributes ?? []} showSearch optionFilterProp="label" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={20} md={12}>
+                              <Form.Item
+                                {...itemProps}
+                                label={field.name === 0 ? "Value" : ""}
+                                name={[field.name, "attribute_value"]}
+                                rules={[{ required: true, message: "Attribute value is required." }]}
+                              >
+                                <Select options={valueOptions} showSearch optionFilterProp="label" />
+                              </Form.Item>
+                            </Col>
+                            <Col xs={4} md={2}>
+                              <Button
+                                danger
+                                type="text"
+                                icon={<DeleteOutlined />}
+                                style={{ marginTop: field.name === 0 ? 28 : 2 }}
+                                onClick={() => remove(field.name)}
+                              />
+                            </Col>
+                          </Row>
+                        );
+                      })}
+                      <Button icon={<PlusOutlined />} onClick={() => add({ attribute: "", attribute_value: "" })}>
+                        Add Attribute
+                      </Button>
+                    </Space>
+                  )}
+                </Form.List>
+              </Col>
+            ) : null}
+            {!variantMode && variantParent ? (
+              <Col xs={24}>
+                <Alert
+                  type="info"
+                  showIcon
+                  message="Variant item"
+                  description="This item is linked to a template. Variant attributes are managed from the template context."
+                />
+              </Col>
+            ) : null}
           </Row>
         )
       },
@@ -342,34 +525,38 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
               <Form.List name="barcodes">
                 {(fields, { add, remove }) => (
                   <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                    {fields.map((field) => (
-                      <Row gutter={12} key={field.key}>
-                        <Col xs={24} md={12}>
-                          <Form.Item
-                            {...field}
-                            label={field.name === 0 ? "Barcode" : ""}
-                            name={[field.name, "barcode"]}
-                            rules={[{ required: true, message: "Barcode is required." }]}
-                          >
-                            <Input />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={20} md={10}>
-                          <Form.Item {...field} label={field.name === 0 ? "UOM" : ""} name={[field.name, "uom"]}>
-                            <Select options={lookups?.uoms ?? []} showSearch optionFilterProp="label" />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={4} md={2}>
-                          <Button
-                            danger
-                            type="text"
-                            icon={<DeleteOutlined />}
-                            style={{ marginTop: field.name === 0 ? 28 : 2 }}
-                            onClick={() => remove(field.name)}
-                          />
-                        </Col>
-                      </Row>
-                    ))}
+                    {fields.map((field) => {
+                      const itemProps = getFormListItemProps(field);
+
+                      return (
+                        <Row gutter={12} key={field.key}>
+                          <Col xs={24} md={12}>
+                            <Form.Item
+                              {...itemProps}
+                              label={field.name === 0 ? "Barcode" : ""}
+                              name={[field.name, "barcode"]}
+                              rules={[{ required: true, message: "Barcode is required." }]}
+                            >
+                              <Input />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={20} md={10}>
+                            <Form.Item {...itemProps} label={field.name === 0 ? "UOM" : ""} name={[field.name, "uom"]}>
+                              <Select options={lookups?.uoms ?? []} showSearch optionFilterProp="label" />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={4} md={2}>
+                            <Button
+                              danger
+                              type="text"
+                              icon={<DeleteOutlined />}
+                              style={{ marginTop: field.name === 0 ? 28 : 2 }}
+                              onClick={() => remove(field.name)}
+                            />
+                          </Col>
+                        </Row>
+                      );
+                    })}
                     <Button icon={<PlusOutlined />} onClick={() => add({ barcode: "", uom: undefined })}>
                       Add Row
                     </Button>
@@ -400,39 +587,43 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
               <Form.List name="item_defaults">
                 {(fields, { add, remove }) => (
                   <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                    {fields.map((field) => (
-                      <Row gutter={12} key={field.key}>
-                        <Col xs={24} md={8}>
-                          <Form.Item
-                            {...field}
-                            label={field.name === 0 ? "Company" : ""}
-                            name={[field.name, "company"]}
-                            rules={[{ required: true, message: "Company is required." }]}
-                          >
-                            <Input />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={24} md={8}>
-                          <Form.Item {...field} label={field.name === 0 ? "Default Warehouse" : ""} name={[field.name, "default_warehouse"]}>
-                            <Input />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={20} md={7}>
-                          <Form.Item {...field} label={field.name === 0 ? "Default Price List" : ""} name={[field.name, "default_price_list"]}>
-                            <Input />
-                          </Form.Item>
-                        </Col>
-                        <Col xs={4} md={1}>
-                          <Button
-                            danger
-                            type="text"
-                            icon={<DeleteOutlined />}
-                            style={{ marginTop: field.name === 0 ? 28 : 2 }}
-                            onClick={() => remove(field.name)}
-                          />
-                        </Col>
-                      </Row>
-                    ))}
+                    {fields.map((field) => {
+                      const itemProps = getFormListItemProps(field);
+
+                      return (
+                        <Row gutter={12} key={field.key}>
+                          <Col xs={24} md={8}>
+                            <Form.Item
+                              {...itemProps}
+                              label={field.name === 0 ? "Company" : ""}
+                              name={[field.name, "company"]}
+                              rules={[{ required: true, message: "Company is required." }]}
+                            >
+                              <Input />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={8}>
+                            <Form.Item {...itemProps} label={field.name === 0 ? "Default Warehouse" : ""} name={[field.name, "default_warehouse"]}>
+                              <Select options={lookups?.warehouses ?? []} showSearch optionFilterProp="label" />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={20} md={7}>
+                            <Form.Item {...itemProps} label={field.name === 0 ? "Default Price List" : ""} name={[field.name, "default_price_list"]}>
+                              <Select options={lookups?.price_lists ?? []} showSearch optionFilterProp="label" />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={4} md={1}>
+                            <Button
+                              danger
+                              type="text"
+                              icon={<DeleteOutlined />}
+                              style={{ marginTop: field.name === 0 ? 28 : 2 }}
+                              onClick={() => remove(field.name)}
+                            />
+                          </Col>
+                        </Row>
+                      );
+                    })}
                     <Button icon={<PlusOutlined />} onClick={() => add({ company: "" })}>
                       Add Row
                     </Button>
@@ -514,49 +705,53 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
           <Form.List name="taxes">
             {(fields, { add, remove }) => (
               <Space direction="vertical" size={12} style={{ width: "100%" }}>
-                {fields.map((field) => (
-                  <Row gutter={12} key={field.key}>
-                    <Col xs={24} md={7}>
-                      <Form.Item
-                        {...field}
-                        label={field.name === 0 ? "Item Tax Template" : ""}
-                        name={[field.name, "item_tax_template"]}
-                        rules={[{ required: true, message: "Item Tax Template is required." }]}
-                      >
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} md={5}>
-                      <Form.Item {...field} label={field.name === 0 ? "Tax Category" : ""} name={[field.name, "tax_category"]}>
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} md={4}>
-                      <Form.Item {...field} label={field.name === 0 ? "Valid From" : ""} name={[field.name, "valid_from"]}>
-                        <Input />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={24} md={3}>
-                      <Form.Item {...field} label={field.name === 0 ? "Min Net" : ""} name={[field.name, "minimum_net_rate"]}>
-                        <InputNumber style={{ width: "100%" }} min={0} precision={2} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={20} md={4}>
-                      <Form.Item {...field} label={field.name === 0 ? "Max Net" : ""} name={[field.name, "maximum_net_rate"]}>
-                        <InputNumber style={{ width: "100%" }} min={0} precision={2} />
-                      </Form.Item>
-                    </Col>
-                    <Col xs={4} md={1}>
-                      <Button
-                        danger
-                        type="text"
-                        icon={<DeleteOutlined />}
-                        style={{ marginTop: field.name === 0 ? 28 : 2 }}
-                        onClick={() => remove(field.name)}
-                      />
-                    </Col>
-                  </Row>
-                ))}
+                {fields.map((field) => {
+                  const itemProps = getFormListItemProps(field);
+
+                  return (
+                    <Row gutter={12} key={field.key}>
+                      <Col xs={24} md={7}>
+                        <Form.Item
+                          {...itemProps}
+                          label={field.name === 0 ? "Item Tax Template" : ""}
+                          name={[field.name, "item_tax_template"]}
+                          rules={[{ required: true, message: "Item Tax Template is required." }]}
+                        >
+                          <Select options={lookups?.tax_templates ?? []} showSearch optionFilterProp="label" />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={5}>
+                        <Form.Item {...itemProps} label={field.name === 0 ? "Tax Category" : ""} name={[field.name, "tax_category"]}>
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={4}>
+                        <Form.Item {...itemProps} label={field.name === 0 ? "Valid From" : ""} name={[field.name, "valid_from"]}>
+                          <Input />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={24} md={3}>
+                        <Form.Item {...itemProps} label={field.name === 0 ? "Min Net" : ""} name={[field.name, "minimum_net_rate"]}>
+                          <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={20} md={4}>
+                        <Form.Item {...itemProps} label={field.name === 0 ? "Max Net" : ""} name={[field.name, "maximum_net_rate"]}>
+                          <InputNumber style={{ width: "100%" }} min={0} precision={2} />
+                        </Form.Item>
+                      </Col>
+                      <Col xs={4} md={1}>
+                        <Button
+                          danger
+                          type="text"
+                          icon={<DeleteOutlined />}
+                          style={{ marginTop: field.name === 0 ? 28 : 2 }}
+                          onClick={() => remove(field.name)}
+                        />
+                      </Col>
+                    </Row>
+                  );
+                })}
                 <Button icon={<PlusOutlined />} onClick={() => add({ item_tax_template: "" })}>
                   Add Row
                 </Button>
@@ -572,7 +767,12 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
           <Row gutter={16}>
             <Col xs={24} md={12}>
               <Form.Item label="Quality Inspection Template" name="quality_inspection_template">
-                <Input />
+                <Select
+                  allowClear
+                  options={lookups?.quality_templates ?? []}
+                  showSearch
+                  optionFilterProp="label"
+                />
               </Form.Item>
             </Col>
             <Col xs={24} md={12}>
@@ -587,7 +787,7 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
         )
       }
     ],
-    [lookups, lookupsLoading, mode]
+    [form, imageValue, lookups, lookupsLoading, mode, variantLookups, variantMode, variantParent]
   );
 
   return (
@@ -603,9 +803,14 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
             <Title level={4} style={{ marginBottom: 0 }}>
               {initialValues?.item_name || initialValues?.item_code || "New Item"}
             </Title>
-            <Text type="secondary">{mode === "edit" ? "ERPNext Item Master" : "Create ERPNext Item Master"}</Text>
+            <Text type="secondary">{mode === "edit" ? "ERPNext Stock" : "Create ERPNext Stock Item"}</Text>
           </div>
           <Space>
+            {mode === "edit" && itemCode ? (
+              <Button size="middle" href={`/stock/items/${encodeURIComponent(itemCode)}/prices`}>
+                Manage Prices
+              </Button>
+            ) : null}
             <Button size="middle" href="/stock/items">
               Back
             </Button>
@@ -614,6 +819,16 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
             </Button>
           </Space>
         </div>
+
+        {mode === "edit" && priceSummary ? (
+          <Card size="small" style={{ marginBottom: 16 }}>
+            <Space size={24} wrap>
+              <Text>Retail: <Text strong>{priceSummary.retail ?? "-"}</Text></Text>
+              <Text>Wholesale: <Text strong>{priceSummary.wholesale ?? "-"}</Text></Text>
+              <Text type="secondary">Last Updated: {priceSummary.last_updated ?? "-"}</Text>
+            </Space>
+          </Card>
+        ) : null}
 
         <Tabs className="erp-item-tabs" items={moduleTabs} />
       </Form>

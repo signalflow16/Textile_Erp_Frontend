@@ -1,3 +1,42 @@
+export type LookupOption = {
+  label: string;
+  value: string;
+};
+
+export type ItemAttributeValueOption = {
+  label: string;
+  value: string;
+};
+
+export type ItemAttributeOption = LookupOption & {
+  values?: ItemAttributeValueOption[];
+};
+
+export type ItemVariantAttributeRow = {
+  attribute: string;
+  attribute_value?: string;
+};
+
+export type ItemBarcode = {
+  barcode: string;
+  barcode_type?: string;
+  uom?: string;
+};
+
+export type ItemDefaultRow = {
+  company: string;
+  default_warehouse?: string;
+  default_price_list?: string;
+};
+
+export type ItemTaxRow = {
+  item_tax_template: string;
+  tax_category?: string;
+  valid_from?: string;
+  minimum_net_rate?: number;
+  maximum_net_rate?: number;
+};
+
 export type ItemRow = {
   item_code: string;
   item_name: string;
@@ -9,11 +48,16 @@ export type ItemRow = {
   is_stock_item: 0 | 1;
   has_variants: 0 | 1;
   modified: string;
+  image?: string | null;
 };
 
 export type ItemListResponse = {
   data: ItemRow[];
+  page: number;
+  page_size: number;
   total_count: number;
+  sort_by?: string;
+  sort_order?: "asc" | "desc";
 };
 
 export type ItemDocument = {
@@ -26,6 +70,7 @@ export type ItemDocument = {
   is_stock_item: 0 | 1;
   has_variants: 0 | 1;
   variant_of?: string;
+  image?: string;
   standard_rate?: number;
   description?: string;
   brand?: string;
@@ -64,38 +109,65 @@ export type ItemDocument = {
   barcodes?: ItemBarcode[];
   item_defaults?: ItemDefaultRow[];
   taxes?: ItemTaxRow[];
-};
-
-export type ItemBarcode = {
-  barcode: string;
-  barcode_type?: string;
-  uom?: string;
-};
-
-export type ItemDefaultRow = {
-  company: string;
-  default_warehouse?: string;
-  default_price_list?: string;
-};
-
-export type ItemTaxRow = {
-  item_tax_template: string;
-  tax_category?: string;
-  valid_from?: string;
-  minimum_net_rate?: number;
-  maximum_net_rate?: number;
-};
-
-export type LookupOption = {
-  label: string;
-  value: string;
+  attributes?: ItemVariantAttributeRow[];
 };
 
 export type ItemMasterLookups = {
   item_groups: LookupOption[];
   uoms: LookupOption[];
   brands: LookupOption[];
+  warehouses: LookupOption[];
+  quality_templates: LookupOption[];
+  tax_templates: LookupOption[];
+  price_lists: LookupOption[];
+  variant_parent_candidates: LookupOption[];
+  item_attributes: ItemAttributeOption[];
+  collections: LookupOption[];
+  seasons: LookupOption[];
+  fabric_types: LookupOption[];
+  display_categories: LookupOption[];
 };
+
+export type ItemVariantAttributeLookups = {
+  item_attributes: ItemAttributeOption[];
+  template_item?: {
+    item_code: string;
+    item_name?: string;
+    attributes?: ItemVariantAttributeRow[];
+  };
+};
+
+export type ItemPriceSummary = {
+  item_code: string;
+  retail?: number | null;
+  wholesale?: number | null;
+  last_updated?: string | null;
+};
+
+export type ItemPriceRow = {
+  name: string;
+  item_code: string;
+  price_list: string;
+  price_list_rate: number;
+  currency?: string;
+  selling?: 0 | 1;
+  buying?: 0 | 1;
+  modified?: string;
+};
+
+export type ItemPriceListResponse = {
+  data: ItemPriceRow[];
+  page: number;
+  page_size: number;
+  total_count: number;
+};
+
+export type ItemMutationResponse = {
+  item: ItemDocument;
+};
+
+export type ItemListSortBy = "modified" | "item_code" | "item_name";
+export type ItemListSortOrder = "asc" | "desc";
 
 export type ItemListParams = {
   page: number;
@@ -107,5 +179,15 @@ export type ItemListParams = {
   variantOf?: string;
   hasVariants?: "all" | "0" | "1";
   disabled?: "all" | "0" | "1";
-  sortBy?: "modified_desc" | "modified_asc" | "item_code_asc" | "item_name_asc";
+  sortBy?: ItemListSortBy;
+  sortOrder?: ItemListSortOrder;
+};
+
+export type ItemPriceListParams = {
+  itemCode: string;
+  page?: number;
+  pageSize?: number;
+  priceList?: string;
+  selling?: "0" | "1";
+  buying?: "0" | "1";
 };
