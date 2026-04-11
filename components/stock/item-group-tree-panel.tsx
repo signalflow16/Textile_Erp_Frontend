@@ -3,15 +3,11 @@
 import { useMemo } from "react";
 import {
   ClearOutlined,
-  EllipsisOutlined,
   EyeOutlined,
   FolderOpenOutlined,
-  PlusOutlined,
-  SearchOutlined,
-  SettingOutlined
+  SearchOutlined
 } from "@ant-design/icons";
-import { Button, Dropdown, Empty, Input, Space, Tag, Tree, Typography } from "antd";
-import type { MenuProps } from "antd";
+import { Button, Empty, Input, Space, Tag, Tree, Typography } from "antd";
 import type { DataNode, TreeProps } from "antd/es/tree";
 
 import type { ItemGroupTreeNode } from "@/types/item-group";
@@ -29,41 +25,12 @@ type ItemGroupTreePanelProps = {
   onExpandedKeysChange: (keys: string[]) => void;
   onExpandAll: () => void;
   onCollapseAll: () => void;
-  onEdit: (itemGroup: string) => void;
-  onAddChild: (itemGroup: string) => void;
   onViewDetails: (itemGroup: string) => void;
 };
-
-const getNodeMenuItems = (
-  node: ItemGroupTreeNode,
-  onEdit: (itemGroup: string) => void,
-  onAddChild: (itemGroup: string) => void,
-  onViewDetails: (itemGroup: string) => void
-): MenuProps["items"] => [
-  {
-    key: "edit",
-    label: "Edit",
-    onClick: () => onEdit(node.name)
-  },
-  {
-    key: "add-child",
-    label: "Add Child",
-    icon: <PlusOutlined />,
-    onClick: () => onAddChild(node.name)
-  },
-  {
-    key: "view-details",
-    label: "View Details",
-    icon: <EyeOutlined />,
-    onClick: () => onViewDetails(node.name)
-  }
-];
 
 const renderTreeTitle = (
   node: ItemGroupTreeNode,
   selectedItemGroup: string | undefined,
-  onEdit: (itemGroup: string) => void,
-  onAddChild: (itemGroup: string) => void,
   onViewDetails: (itemGroup: string) => void
 ) => (
   <div className={`item-group-tree-row ${selectedItemGroup === node.name ? "selected" : ""}`}>
@@ -85,32 +52,28 @@ const renderTreeTitle = (
         </Text>
       </Space>
     </div>
-    <Dropdown
-      trigger={["click"]}
-      menu={{ items: getNodeMenuItems(node, onEdit, onAddChild, onViewDetails) }}
-    >
-      <Button
-        type="text"
-        size="small"
-        className="item-group-tree-action"
-        icon={<SettingOutlined />}
-        onClick={(event) => event.stopPropagation()}
-      />
-    </Dropdown>
+    <Button
+      type="text"
+      size="small"
+      className="item-group-tree-action"
+      icon={<EyeOutlined />}
+      onClick={(event) => {
+        event.stopPropagation();
+        onViewDetails(node.name);
+      }}
+    />
   </div>
 );
 
 const toTreeData = (
   nodes: ItemGroupTreeNode[],
   selectedItemGroup: string | undefined,
-  onEdit: (itemGroup: string) => void,
-  onAddChild: (itemGroup: string) => void,
   onViewDetails: (itemGroup: string) => void
 ): DataNode[] =>
   nodes.map((node) => ({
     key: node.name,
-    title: renderTreeTitle(node, selectedItemGroup, onEdit, onAddChild, onViewDetails),
-    children: toTreeData(node.children ?? [], selectedItemGroup, onEdit, onAddChild, onViewDetails)
+    title: renderTreeTitle(node, selectedItemGroup, onViewDetails),
+    children: toTreeData(node.children ?? [], selectedItemGroup, onViewDetails)
   }));
 
 export function ItemGroupTreePanel({
@@ -124,13 +87,11 @@ export function ItemGroupTreePanel({
   onExpandedKeysChange,
   onExpandAll,
   onCollapseAll,
-  onEdit,
-  onAddChild,
   onViewDetails
 }: ItemGroupTreePanelProps) {
   const treeData = useMemo(
-    () => toTreeData(nodes, selectedItemGroup, onEdit, onAddChild, onViewDetails),
-    [nodes, onAddChild, onEdit, onViewDetails, selectedItemGroup]
+    () => toTreeData(nodes, selectedItemGroup, onViewDetails),
+    [nodes, onViewDetails, selectedItemGroup]
   );
 
   const onSelectTree: TreeProps["onSelect"] = (selectedKeys) => {
@@ -174,9 +135,7 @@ export function ItemGroupTreePanel({
         <span className="item-group-summary-inline">
           <FolderOpenOutlined /> {nodes.length} root groups
         </span>
-        <span className="item-group-summary-inline">
-          <EllipsisOutlined /> Use the settings icon for quick actions
-        </span>
+        <span className="item-group-summary-inline">Read-only browser for standard item groups</span>
       </div>
 
       <div className="item-group-tree-simple-card">

@@ -2,24 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter, useRouter } from "next/navigation";
-import { Avatar, Button, Input, Layout, Menu, Typography } from "antd";
-import type { MenuProps } from "antd";
+import { usePathname, useRouter } from "next/navigation";
+import { Button, Layout, Menu, Space, Tag, Typography } from "antd";
 import {
+  AntDesignOutlined,
   AppstoreOutlined,
   DatabaseOutlined,
-  FileAddOutlined,
-  HomeOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
-  QuestionCircleOutlined,
-  SearchOutlined,
-  SettingOutlined,
   ShopOutlined,
   ShoppingCartOutlined,
-  TeamOutlined,
-  SkinOutlined,
   TeamOutlined
 } from "@ant-design/icons";
 import { clearAuthTokens } from "@/lib/auth-storage";
@@ -54,44 +47,32 @@ export function AppShell({
   const [isMobile, setIsMobile] = useState(false);
 
   const selectedKey = (() => {
-    if (pathname === "/initial-setup") {
-      return "admin-initial-setup-dashboard";
-    }
-
-    if (pathname.startsWith("/initial-setup/company")) {
-      return "admin-initial-setup-company";
-    }
-
-    if (pathname.startsWith("/initial-setup/warehouses")) {
-      return "admin-initial-setup-warehouses";
-    }
-
-    if (pathname.startsWith("/initial-setup/uoms")) {
-      return "admin-initial-setup-uoms";
-    }
-
-    if (pathname.startsWith("/initial-setup/item-groups")) {
-      return "admin-initial-setup-item-groups";
-    }
-
-    if (pathname.startsWith("/initial-setup/suppliers")) {
-      return "admin-initial-setup-suppliers";
-    }
-
-    if (pathname.startsWith("/initial-setup/customers")) {
-      return "admin-initial-setup-customers";
-    }
-
-    if (pathname.startsWith("/initial-setup")) {
-      return "admin-initial-setup-dashboard";
-    }
-
     if (pathname.startsWith("/users")) {
       return "admin-users";
     }
 
-    if (pathname === "/stock/items/new") {
-      return "stock-items-new";
+    if (pathname.startsWith("/stock/item-groups")) {
+      return "stock-item-groups";
+    }
+
+    if (pathname.startsWith("/stock/stock-entry/create")) {
+      return "stock-entry-create";
+    }
+
+    if (pathname.startsWith("/stock/stock-entry/list")) {
+      return "stock-entry-list";
+    }
+
+    if (pathname.startsWith("/stock/warehouses")) {
+      return "stock-warehouses";
+    }
+
+    if (pathname.startsWith("/stock/parties")) {
+      return "stock-parties";
+    }
+
+    if (pathname === "/stock") {
+      return "stock-dashboard";
     }
 
     return "stock-items-list";
@@ -143,7 +124,7 @@ export function AppShell({
           theme="light"
           mode="inline"
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={["item-master-menu", "initial-setup-menu"]}
+          defaultOpenKeys={["item-master-menu"]}
           items={[
             {
               key: "stock-header",
@@ -153,16 +134,35 @@ export function AppShell({
                 {
                   key: "item-master-menu",
                   icon: <DatabaseOutlined />,
-                  label: "Item Master",
+                  label: "Stock",
                   children: [
                     {
-                      key: "stock-items-list",
-                      label: <Link href="/stock/items">Item List</Link>
+                      key: "stock-dashboard",
+                      label: <Link href="/stock">Dashboard</Link>
                     },
                     {
-                      key: "stock-items-new",
-                      icon: <FileAddOutlined />,
-                      label: <Link href="/stock/items/new">Create Item</Link>
+                      key: "stock-items-list",
+                      label: <Link href="/stock/items">Items</Link>
+                    },
+                    {
+                      key: "stock-item-groups",
+                      label: <Link href="/stock/item-groups">Item Groups</Link>
+                    },
+                    {
+                      key: "stock-warehouses",
+                      label: <Link href="/stock/warehouses">Warehouses</Link>
+                    },
+                    {
+                      key: "stock-parties",
+                      label: <Link href="/stock/parties">Parties</Link>
+                    },
+                    {
+                      key: "stock-entry-create",
+                      label: <Link href="/stock/stock-entry/create">Stock Entry Create</Link>
+                    },
+                    {
+                      key: "stock-entry-list",
+                      label: <Link href="/stock/stock-entry/list">Stock Entry List</Link>
                     }
                   ]
                 }
@@ -173,41 +173,6 @@ export function AppShell({
               type: "group",
               label: "Administration",
               children: [
-                {
-                  key: "initial-setup-menu",
-                  icon: <DatabaseOutlined />,
-                  label: "Initial Setup",
-                  children: [
-                    {
-                      key: "admin-initial-setup-dashboard",
-                      label: <Link href="/initial-setup">Dashboard</Link>
-                    },
-                    {
-                      key: "admin-initial-setup-company",
-                      label: <Link href="/initial-setup/company">Company</Link>
-                    },
-                    {
-                      key: "admin-initial-setup-warehouses",
-                      label: <Link href="/initial-setup/warehouses">Warehouses</Link>
-                    },
-                    {
-                      key: "admin-initial-setup-uoms",
-                      label: <Link href="/initial-setup/uoms">UOMs</Link>
-                    },
-                    {
-                      key: "admin-initial-setup-item-groups",
-                      label: <Link href="/initial-setup/item-groups">Item Groups</Link>
-                    },
-                    {
-                      key: "admin-initial-setup-suppliers",
-                      label: <Link href="/initial-setup/suppliers">Suppliers</Link>
-                    },
-                    {
-                      key: "admin-initial-setup-customers",
-                      label: <Link href="/initial-setup/customers">Customers</Link>
-                    }
-                  ]
-                },
                 {
                   key: "admin-users",
                   icon: <TeamOutlined />,

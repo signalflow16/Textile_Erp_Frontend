@@ -21,13 +21,11 @@ const clean = (value?: string | null) => {
 };
 
 export const normalizeItemGroupPayload = (values: ItemGroupFormValues): ItemGroupMutationPayload => {
+  // MIGRATION NOTE: Standard ERPNext Item Group resource portability is limited to core hierarchy fields.
   const payload: ItemGroupMutationPayload = {
     item_group_name: clean(values.item_group_name),
     parent_item_group: clean(values.parent_item_group) ?? null,
-    is_group: values.is_group ? 1 : 0,
-    disabled: values.disabled ? 1 : 0,
-    image: clean(values.image),
-    description: clean(values.description)
+    is_group: values.is_group ? 1 : 0
   };
 
   return Object.fromEntries(

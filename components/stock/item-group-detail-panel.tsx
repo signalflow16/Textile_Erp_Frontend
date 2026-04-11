@@ -2,13 +2,9 @@
 
 import {
   AppstoreAddOutlined,
-  DeleteOutlined,
-  DragOutlined,
-  EditOutlined,
-  EyeOutlined,
-  StopOutlined
+  EyeOutlined
 } from "@ant-design/icons";
-import { Alert, Button, Card, Descriptions, Drawer, Empty, Image, Skeleton, Space, Tag, Typography } from "antd";
+import { Alert, Card, Descriptions, Drawer, Empty, Image, Skeleton, Space, Tag, Typography } from "antd";
 
 import type { ItemGroupDocument } from "@/types/item-group";
 import {
@@ -25,11 +21,6 @@ type ItemGroupDetailPanelProps = {
   isLoading: boolean;
   error?: boolean;
   onClose: () => void;
-  onEdit: () => void;
-  onAddChild: () => void;
-  onMove: () => void;
-  onDelete: () => void;
-  onToggleDisabled: () => void;
 };
 
 export function ItemGroupDetailPanel({
@@ -37,12 +28,7 @@ export function ItemGroupDetailPanel({
   itemGroup,
   isLoading,
   error,
-  onClose,
-  onEdit,
-  onAddChild,
-  onMove,
-  onDelete,
-  onToggleDisabled
+  onClose
 }: ItemGroupDetailPanelProps) {
   return (
     <Drawer
@@ -60,7 +46,7 @@ export function ItemGroupDetailPanel({
           type="error"
           showIcon
           message="Item Group could not be loaded"
-          description="Confirm the group exists and that the backend endpoint is reachable."
+          description="Confirm the group exists and that the ERPNext resource is reachable."
         />
       ) : null}
 
@@ -90,36 +76,7 @@ export function ItemGroupDetailPanel({
             </div>
           </div>
 
-          <div className="item-group-drawer-actions">
-            <Space size={8} wrap>
-              <Button type="primary" icon={<EditOutlined />} onClick={onEdit}>
-                Edit
-              </Button>
-              <Button icon={<AppstoreAddOutlined />} onClick={onAddChild}>
-                Add Child
-              </Button>
-            </Space>
-            <Space size={8} wrap>
-              <Button icon={<DragOutlined />} onClick={onMove}>
-                Move
-              </Button>
-              <Button
-                icon={<StopOutlined />}
-                disabled={itemGroup.disabled ? !itemGroup.can_enable : !itemGroup.can_disable}
-                onClick={onToggleDisabled}
-              >
-                {itemGroup.disabled ? "Enable" : "Disable"}
-              </Button>
-              <Button
-                danger
-                icon={<DeleteOutlined />}
-                disabled={!itemGroup.can_delete}
-                onClick={onDelete}
-              >
-                Delete
-              </Button>
-            </Space>
-          </div>
+          <Text type="secondary">Read-only view sourced from the standard ERPNext Item Group resource.</Text>
 
           <Card size="small" className="item-group-drawer-card">
             <div className="item-group-stat-row">

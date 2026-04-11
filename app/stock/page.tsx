@@ -1,10 +1,14 @@
 import { AppShell } from "@/components/app-shell";
-import { UnderDevelopmentPage } from "@/components/under-development-page";
+import { StockDashboardPage } from "@/components/stock/stock-dashboard-page";
 
 export default function StockPage() {
   return (
-    <AppShell title="Stock" breadcrumb="Stock">
-      <UnderDevelopmentPage />
+    <AppShell
+      title="Stock Dashboard"
+      breadcrumb="Stock"
+      subtitle="Live inventory visibility, warehouse value trends, and stock movement monitoring."
+    >
+      <StockDashboardPage />
     </AppShell>
   );
 }

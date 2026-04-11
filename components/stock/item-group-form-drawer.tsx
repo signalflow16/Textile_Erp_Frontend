@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { App, Button, Checkbox, Drawer, Form, Input, Select, Space } from "antd";
+import { App, Button, Checkbox, Drawer, Form, Input, Select, Space, Typography } from "antd";
 
 import {
   getErrorMessage,
@@ -15,6 +15,8 @@ import {
   useUpdateItemGroupMutation
 } from "@/store/api/frappeApi";
 import type { ItemGroupDocument } from "@/types/item-group";
+
+const { Text } = Typography;
 
 type ItemGroupFormDrawerProps = {
   open: boolean;
@@ -133,19 +135,23 @@ export function ItemGroupFormDrawer({
         </Form.Item>
 
         <Form.Item label="Image URL" name="image">
-          <Input size="large" placeholder="https://... or /files/item-group.png" />
+          <Input size="large" placeholder="Not available on the standard ERPNext Item Group resource" disabled />
         </Form.Item>
 
         <Form.Item label="Description" name="description">
-          <Input.TextArea rows={5} placeholder="Describe when this group should be used." />
+          <Input.TextArea rows={5} placeholder="Not available on the standard ERPNext Item Group resource" disabled />
         </Form.Item>
+
+        <Text type="secondary">
+          Standard ERPNext Item Group migration currently supports hierarchy fields only: name, parent, and group flag.
+        </Text>
 
         <Form.Item name="is_group" valuePropName="checked">
           <Checkbox>Acts as a parent group</Checkbox>
         </Form.Item>
 
         <Form.Item name="disabled" valuePropName="checked">
-          <Checkbox>Disabled</Checkbox>
+          <Checkbox disabled>Disabled</Checkbox>
         </Form.Item>
       </Form>
     </Drawer>
