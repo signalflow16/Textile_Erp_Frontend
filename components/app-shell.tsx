@@ -55,6 +55,22 @@ export function AppShell({
       return "stock-item-groups";
     }
 
+    if (pathname.startsWith("/stock/balance")) {
+      return "stock-balance";
+    }
+
+    if (pathname.startsWith("/stock/ledger")) {
+      return "stock-ledger";
+    }
+
+    if (pathname.startsWith("/stock/warehouse-stock")) {
+      return "stock-warehouse-stock";
+    }
+
+    if (pathname.startsWith("/stock/item-shortage")) {
+      return "stock-item-shortage";
+    }
+
     if (pathname.startsWith("/stock/stock-entry/create")) {
       return "stock-entry-create";
     }
@@ -155,6 +171,22 @@ export function AppShell({
                     {
                       key: "stock-parties",
                       label: <Link href="/stock/parties">Parties</Link>
+                    },
+                    {
+                      key: "stock-balance",
+                      label: <Link href="/stock/balance">Stock Balance</Link>
+                    },
+                    {
+                      key: "stock-ledger",
+                      label: <Link href="/stock/ledger">Stock Ledger</Link>
+                    },
+                    {
+                      key: "stock-warehouse-stock",
+                      label: <Link href="/stock/warehouse-stock">Warehouse Stock</Link>
+                    },
+                    {
+                      key: "stock-item-shortage",
+                      label: <Link href="/stock/item-shortage">Item Shortage</Link>
                     },
                     {
                       key: "stock-entry-create",

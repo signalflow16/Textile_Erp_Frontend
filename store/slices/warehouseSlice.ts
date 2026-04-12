@@ -11,6 +11,8 @@ import {
 
 import { apiRequest, normalizeApiError } from "@/services/axiosInstance";
 import { masterDataEndpoints } from "@/services/endpoints";
+import { fetchAllFrappePages } from "@/services/frappe";
+import { invalidateStockSnapshots } from "@/store/actions/stockSync";
 import type { RootState } from "@/store";
 import type {
   FrappeDocumentPayload,
@@ -78,17 +80,11 @@ export const fetchWarehouses = createAsyncThunk<WarehouseRow[], void, { rejectVa
   "warehouses/fetchWarehouses",
   async (_arg, thunkApi) => {
     try {
-      const payload = await apiRequest<FrappeListPayload<WarehouseRow>>({
+      return await fetchAllFrappePages<WarehouseRow>({
         url: masterDataEndpoints.warehouse.list,
-        method: "GET",
-        params: {
-          fields: encodeFrappeJson(["name", "warehouse_name", "parent_warehouse", "company", "is_group", "disabled", "modified"]),
-          order_by: "warehouse_name asc",
-          limit_page_length: 500
-        }
+        fields: ["name", "warehouse_name", "parent_warehouse", "company", "is_group", "disabled", "modified"],
+        orderBy: "warehouse_name asc"
       });
-
-      return payload.data ?? [];
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to fetch warehouses.").message);
     }
@@ -133,6 +129,7 @@ export const createWarehouse = createAsyncThunk<WarehouseRow, WarehouseCreateVal
         }
       });
 
+      thunkApi.dispatch(invalidateStockSnapshots());
       return response.data;
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to create warehouse.").message);
@@ -178,6 +175,7 @@ export const updateWarehouse = createAsyncThunk<
         }
       });
 
+      thunkApi.dispatch(invalidateStockSnapshots());
       return response.data;
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to update warehouse.").message);

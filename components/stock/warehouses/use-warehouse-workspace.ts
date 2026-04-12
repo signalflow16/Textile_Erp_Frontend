@@ -64,7 +64,6 @@ export function useWarehouseWorkspace(defaultSelectedWarehouse?: string) {
   useEffect(() => {
     if (defaultSelectedWarehouse) {
       dispatch(setSelectedWarehouse(defaultSelectedWarehouse));
-      void dispatch(fetchWarehouseDetail(defaultSelectedWarehouse));
     }
   }, [defaultSelectedWarehouse, dispatch]);
 

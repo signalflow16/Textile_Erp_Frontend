@@ -1225,24 +1225,105 @@ a {
   justify-content: space-between;
   align-items: flex-start;
   gap: 16px;
+  margin-bottom: 24px;
 }
 
 .stock-dashboard-card.ant-card,
 .stock-chart-card.ant-card,
 .stock-entry-document-card.ant-card {
-  border-radius: 18px !important;
+  border-radius: 12px !important;
   border: 1px solid #e5ebf3 !important;
-  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .stock-dashboard-card.ant-card:hover,
 .stock-chart-card.ant-card:hover,
 .stock-entry-document-card.ant-card:hover {
-  transform: none;
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.stock-dashboard-page {
+  gap: 24px !important;
+}
+
+.stock-dashboard-toolbar-copy {
+  display: grid;
+  gap: 6px;
+  max-width: 760px;
+}
+
+.stock-dashboard-stats-row {
+  margin-bottom: 8px;
+}
+
+.stock-dashboard-card.ant-card {
+  height: 132px;
+}
+
+.stock-dashboard-card .ant-card-body {
+  height: 100%;
+  padding: 16px;
+}
+
+.stock-dashboard-card-shell {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stock-dashboard-card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex: 0 0 auto;
+}
+
+.stock-dashboard-card-content {
+  width: 100%;
+}
+
+.stock-dashboard-card-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6b7280;
 }
 
 .stock-dashboard-card .ant-statistic {
-  margin-bottom: 10px;
+  margin-bottom: 0;
+}
+
+.stock-dashboard-card .ant-statistic-content {
+  font-size: 28px;
+  line-height: 1.15;
+}
+
+.stock-dashboard-card-blue .stock-dashboard-card-icon {
+  background: linear-gradient(135deg, #e6f4ff 0%, #bae0ff 100%);
+  color: #1677ff;
+}
+
+.stock-dashboard-card-cyan .stock-dashboard-card-icon {
+  background: linear-gradient(135deg, #e6fffb 0%, #b5f5ec 100%);
+  color: #08979c;
+}
+
+.stock-dashboard-card-green .stock-dashboard-card-icon {
+  background: linear-gradient(135deg, #f6ffed 0%, #d9f7be 100%);
+  color: #389e0d;
+}
+
+.stock-dashboard-card-gold .stock-dashboard-card-icon {
+  background: linear-gradient(135deg, #fffbe6 0%, #ffe58f 100%);
+  color: #d48806;
 }
 
 .stock-chart-card-title {
@@ -1251,51 +1332,140 @@ a {
   gap: 10px;
 }
 
-.stock-bar-chart {
-  display: grid;
-  gap: 14px;
+.stock-chart-card.ant-card {
+  height: 100%;
+  min-height: 336px;
 }
 
-.stock-bar-row {
-  display: grid;
-  gap: 8px;
+.stock-chart-card .ant-card-head {
+  min-height: 64px;
 }
 
-.stock-bar-row-head {
+.stock-chart-card .ant-card-body {
+  padding: 16px;
+  min-height: 300px;
+}
+
+.stock-chart-card-body {
+  min-height: 300px;
+  height: 100%;
+}
+
+.stock-chart-state {
+  min-height: 300px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.stock-chart-stack {
+  width: 100%;
+}
+
+.warehouse-stock-trend-chart {
+  min-height: 300px;
+  height: 300px;
+  padding-top: 4px;
+}
+
+.warehouse-stock-trend-chart > div,
+.warehouse-stock-trend-chart canvas {
+  border-radius: 12px;
+}
+
+.stock-progress-row {
+  display: grid;
+  gap: 10px;
+}
+
+.stock-progress-row-head {
   display: flex;
   justify-content: space-between;
   gap: 12px;
   align-items: center;
 }
 
-.stock-bar-label {
-  max-width: 220px;
+.stock-progress-row-title {
+  max-width: 62%;
 }
 
-.stock-bar-track {
+.stock-trend-chart-shell {
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.stock-trend-chart-canvas {
+  min-height: 220px;
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(245, 247, 250, 0.9) 0%, rgba(255, 255, 255, 0.98) 100%),
+    repeating-linear-gradient(
+      to top,
+      rgba(148, 163, 184, 0.14) 0,
+      rgba(148, 163, 184, 0.14) 1px,
+      transparent 1px,
+      transparent 52px
+    );
+  padding: 10px;
+}
+
+.stock-trend-chart-svg {
   width: 100%;
-  height: 10px;
-  border-radius: 999px;
-  background: #edf2f7;
-  overflow: hidden;
+  height: 220px;
+  display: block;
 }
 
-.stock-bar-fill {
-  height: 100%;
-  border-radius: inherit;
-  background: linear-gradient(90deg, #2563eb 0%, #60a5fa 100%);
-}
-
-.stock-chart-empty-copy {
-  color: #64748b;
-  min-height: 180px;
+.stock-trend-chart-footer {
   display: grid;
-  place-items: center;
-  text-align: center;
+  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+  gap: 12px;
+}
+
+.stock-trend-chart-point {
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid #e5ebf3;
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.stock-trend-chart-month {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.stock-detail-list.ant-list {
+  min-height: 300px;
+}
+
+.stock-detail-list .ant-list-items {
+  display: grid;
+  gap: 12px;
 }
 
 .stock-detail-list-item {
-  padding-inline: 0 !important;
+  padding: 14px 0 !important;
+  border-block-end: 1px solid #eef2f7 !important;
+}
+
+.stock-detail-list-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.stock-chart-state .ant-empty {
+  margin-block: 0;
+}
+
+.stock-chart-state .ant-empty-description {
+  max-width: 280px;
+  margin-inline: auto;
+  color: #64748b;
 }
 
 .stock-entry-page-shell {
@@ -1372,6 +1542,136 @@ a {
   gap: 16px;
 }
 
+.stock-report-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px 22px;
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+}
+
+.stock-report-page-header-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.stock-report-page-title {
+  color: #111827 !important;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.stock-report-page-subtitle {
+  color: #64748b !important;
+}
+
+.stock-report-toolbar {
+  position: sticky;
+  top: 12px;
+  z-index: 5;
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(10px);
+}
+
+.stock-report-active-filters {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 0 2px;
+}
+
+.stock-report-filter-chip.ant-tag {
+  border-radius: 999px;
+  background: #edf4ff;
+  color: #1d4ed8;
+  padding-inline: 12px;
+  line-height: 28px;
+}
+
+.stock-report-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stock-report-stat-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid #e6ebf2;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.04);
+}
+
+.stock-report-stat-label {
+  color: #64748b !important;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stock-report-stat-value {
+  color: #0f172a !important;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.stock-report-table-card {
+  background: #ffffff;
+  border: 1px solid #e8ebf0;
+  border-radius: 16px;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+  overflow: hidden;
+}
+
+.stock-report-table .ant-table {
+  background: #ffffff;
+}
+
+.stock-report-table .ant-table-thead > tr > th {
+  background: #f8fafc !important;
+  color: #334155;
+  font-weight: 600;
+}
+
+.stock-report-skeleton {
+  padding: 18px 18px 0;
+}
+
+.stock-report-filter-modal .ant-modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+.stock-report-filter-preset-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.stock-report-filter-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stock-report-filter-help {
+  display: block;
+  margin-top: 8px;
+  color: #64748b !important;
+  font-size: 12px;
+}
+
 @media (max-width: 768px) {
   .app-content {
     padding: 0 16px 20px;
@@ -1432,7 +1732,9 @@ a {
   .item-group-document-form-grid-2,
   .stock-entry-form-grid,
   .stock-entry-list-toolbar,
-  .stock-entry-detail-meta {
+  .stock-entry-detail-meta,
+  .stock-report-stat-strip,
+  .stock-report-filter-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1465,5 +1767,15 @@ a {
   .filter-actions {
     justify-content: stretch;
     flex-direction: column;
+  }
+
+  .stock-report-page-header,
+  .stock-report-active-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .stock-report-toolbar {
+    position: static;
   }
 }

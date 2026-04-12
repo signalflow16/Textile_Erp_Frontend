@@ -9,6 +9,8 @@ import {
 
 import { apiRequest, normalizeApiError } from "@/services/axiosInstance";
 import { masterDataEndpoints } from "@/services/endpoints";
+import { buildPagedParams, fetchAllFrappePages, fetchFrappeCount } from "@/services/frappe";
+import { invalidateStockSnapshots } from "@/store/actions/stockSync";
 import type { RootState } from "@/store";
 import type {
   FrappeDocField,
@@ -25,6 +27,8 @@ import type { LookupOption } from "@/types/item";
 type FetchItemsArgs = {
   search?: string;
   itemGroup?: string;
+  page?: number;
+  pageSize?: number;
 };
 
 type FetchLookupsResult = ItemFormLookups & {
@@ -40,6 +44,11 @@ type ItemsSliceState = EntityState<ItemMasterRow, string> & {
   lookups: ItemFormLookups;
   fieldAvailability: ItemFieldAvailability;
   lastQuery: FetchItemsArgs;
+  pagination: {
+    current: number;
+    pageSize: number;
+    total: number;
+  };
 };
 
 const itemsAdapter = createEntityAdapter<ItemMasterRow, string>({
@@ -62,7 +71,12 @@ const initialState: ItemsSliceState = itemsAdapter.getInitialState({
     color: false,
     gsm: false
   },
-  lastQuery: {}
+  lastQuery: {},
+  pagination: {
+    current: 1,
+    pageSize: 20,
+    total: 0
+  }
 });
 
 const mapLookupOptions = <T extends Record<string, unknown>>(rows: T[], valueKey: keyof T, labelKey?: keyof T): LookupOption[] => {
@@ -85,8 +99,6 @@ const mapLookupOptions = <T extends Record<string, unknown>>(rows: T[], valueKey
   return options;
 };
 
-const encodeFrappeJson = (value: unknown) => JSON.stringify(value);
-
 const buildFilters = ({ search, itemGroup }: FetchItemsArgs) => {
   const filters: unknown[][] = [["disabled", "in", [0, 1]]];
   const orFilters: unknown[][] = [];
@@ -104,26 +116,45 @@ const buildFilters = ({ search, itemGroup }: FetchItemsArgs) => {
   return { filters, orFilters };
 };
 
-export const fetchItems = createAsyncThunk<ItemMasterRow[], FetchItemsArgs | undefined, { rejectValue: string }>(
+export const fetchItems = createAsyncThunk<
+  { rows: ItemMasterRow[]; total: number; page: number; pageSize: number },
+  FetchItemsArgs | undefined,
+  { rejectValue: string }
+>(
   "items/fetchItems",
   async (args, thunkApi) => {
     const query = args ?? {};
     const { filters, orFilters } = buildFilters(query);
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 20;
 
     try {
-      const payload = await apiRequest<FrappeListPayload<ItemMasterRow>>({
-        url: masterDataEndpoints.item.list,
-        method: "GET",
-        params: {
-          fields: encodeFrappeJson(["name", "item_code", "item_name", "item_group", "stock_uom", "disabled", "modified"]),
-          filters: encodeFrappeJson(filters),
-          ...(orFilters.length ? { or_filters: encodeFrappeJson(orFilters) } : {}),
-          order_by: "modified desc",
-          limit_page_length: 200
-        }
-      });
+      const [total, payload] = await Promise.all([
+        fetchFrappeCount({
+          url: masterDataEndpoints.item.list,
+          filters,
+          orFilters
+        }),
+        apiRequest<FrappeListPayload<ItemMasterRow>>({
+          url: masterDataEndpoints.item.list,
+          method: "GET",
+          params: buildPagedParams({
+            fields: ["name", "item_code", "item_name", "item_group", "stock_uom", "disabled", "modified"],
+            filters,
+            orFilters,
+            orderBy: "modified desc",
+            page,
+            pageSize
+          })
+        })
+      ]);
 
-      return payload.data ?? [];
+      return {
+        rows: payload.data ?? [],
+        total,
+        page,
+        pageSize
+      };
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to fetch items.").message);
     }
@@ -135,24 +166,16 @@ export const fetchItemLookups = createAsyncThunk<FetchLookupsResult, void, { rej
   async (_arg, thunkApi) => {
     try {
       const [itemGroupsPayload, uomsPayload, itemMetaPayload] = await Promise.all([
-        apiRequest<FrappeListPayload<{ name: string; item_group_name?: string | null }>>({
+        fetchAllFrappePages<{ name: string; item_group_name?: string | null }>({
           url: masterDataEndpoints.itemGroup.list,
-          method: "GET",
-          params: {
-            fields: encodeFrappeJson(["name", "item_group_name"]),
-            filters: encodeFrappeJson([["is_group", "=", 0]]),
-            order_by: "item_group_name asc",
-            limit_page_length: 500
-          }
+          fields: ["name", "item_group_name"],
+          filters: [["is_group", "=", 0]],
+          orderBy: "item_group_name asc"
         }),
-        apiRequest<FrappeListPayload<{ name: string; uom_name?: string | null }>>({
+        fetchAllFrappePages<{ name: string; uom_name?: string | null }>({
           url: masterDataEndpoints.uom.list,
-          method: "GET",
-          params: {
-            fields: encodeFrappeJson(["name", "uom_name"]),
-            order_by: "uom_name asc",
-            limit_page_length: 500
-          }
+          fields: ["name", "uom_name"],
+          orderBy: "uom_name asc"
         }),
         apiRequest<FrappeDocumentPayload<{ fields?: FrappeDocField[] }>>({
           url: masterDataEndpoints.item.meta,
@@ -167,8 +190,8 @@ export const fetchItemLookups = createAsyncThunk<FetchLookupsResult, void, { rej
       );
 
       return {
-        itemGroups: mapLookupOptions(itemGroupsPayload.data ?? [], "name", "item_group_name"),
-        uoms: mapLookupOptions(uomsPayload.data ?? [], "name", "uom_name"),
+        itemGroups: mapLookupOptions(itemGroupsPayload ?? [], "name", "item_group_name"),
+        uoms: mapLookupOptions(uomsPayload ?? [], "name", "uom_name"),
         fieldAvailability: {
           fabric_type: fieldNames.has("fabric_type"),
           color: fieldNames.has("color"),
@@ -213,6 +236,7 @@ export const createItem = createAsyncThunk<ItemMasterRow, ItemCreateValues, { st
         data: payload
       });
 
+      thunkApi.dispatch(invalidateStockSnapshots());
       return response.data;
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to create item.").message);
@@ -238,7 +262,12 @@ const itemsSlice = createSlice({
       })
       .addCase(fetchItems.fulfilled, (state, action) => {
         state.fetchStatus = "succeeded";
-        itemsAdapter.setAll(state, action.payload);
+        state.pagination = {
+          current: action.payload.page,
+          pageSize: action.payload.pageSize,
+          total: action.payload.total
+        };
+        itemsAdapter.setAll(state, action.payload.rows);
       })
       .addCase(fetchItems.rejected, (state, action) => {
         state.fetchStatus = "failed";

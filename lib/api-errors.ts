@@ -74,13 +74,6 @@ export const extractApiErrorMessage = (error: unknown, fallback: string) => {
   if ("data" in error) {
     const payload = (error as { data?: unknown }).data;
     if (payload && typeof payload === "object") {
-      const serverMessage = parseFrappeServerMessages(
-        (payload as { _server_messages?: unknown })._server_messages
-      );
-      if (serverMessage) {
-        return serverMessage;
-      }
-
       if ("error" in payload) {
         const details = (payload as { error?: { message?: string } }).error;
         const detailsMessage = asText(details?.message);
@@ -94,6 +87,13 @@ export const extractApiErrorMessage = (error: unknown, fallback: string) => {
       const details = asText((payload as { details?: unknown }).details);
       if (message || exception || details) {
         return message || exception || details || fallback;
+      }
+
+      const serverMessage = parseFrappeServerMessages(
+        (payload as { _server_messages?: unknown })._server_messages
+      );
+      if (serverMessage) {
+        return serverMessage;
       }
     }
   }

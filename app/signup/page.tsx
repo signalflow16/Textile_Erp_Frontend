@@ -80,7 +80,7 @@ export default function SignUpPage() {
       }
 
       dispatch(setAuthMe(meResponse.data));
-      router.replace("/stock/items");
+      router.replace("/stock");
     } catch (error) {
       setErrorMessage(extractApiErrorMessage(error, "Unable to complete owner signup."));
     }

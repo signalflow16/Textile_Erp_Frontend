@@ -20,6 +20,17 @@ type StockEntryFormValues = {
   items: StockEntryCreateValues["items"];
 };
 
+const getStockEntryErrorMessage = (error: unknown) => {
+  const fallback = "Please review the form values and try again.";
+  const message = typeof error === "string" ? error : fallback;
+
+  if (message.includes("FiscalYearError")) {
+    return "The posting date is outside an active Fiscal Year for the company linked to this stock entry. Create or activate the Fiscal Year in ERPNext, or change the posting date to a valid fiscal period.";
+  }
+
+  return message;
+};
+
 export function StockEntryForm() {
   const dispatch = useAppDispatch();
   const router = useRouter();
@@ -67,15 +78,15 @@ export function StockEntryForm() {
       ).unwrap();
 
       notification.success({
-        message: "Stock entry created",
-        description: "The stock movement was saved successfully."
+        message: "Stock entry submitted",
+        description: "The stock movement was created and submitted successfully."
       });
 
       router.push("/stock/stock-entry/list");
     } catch (error) {
       notification.error({
-        message: "Unable to create stock entry",
-        description: typeof error === "string" ? error : "Please review the form values and try again."
+        message: "Unable to submit stock entry",
+        description: getStockEntryErrorMessage(error)
       });
     }
   };
@@ -90,7 +101,7 @@ export function StockEntryForm() {
           <div>
             <Text className="item-toolbar-title">New Stock Entry</Text>
             <Text className="item-toolbar-subtitle">
-              Capture inbound, outbound, and transfer movements using standard ERPNext stock entry structure.
+              Capture inbound, outbound, and transfer movements and submit them so ERPNext updates stock bins and stock ledger balances.
             </Text>
           </div>
           <Space wrap>
@@ -103,7 +114,7 @@ export function StockEntryForm() {
               disabled={stockState.lookupsStatus === "loading" || lookups.items.length === 0 || lookups.warehouses.length === 0}
               onClick={() => void form.submit()}
             >
-              Save Stock Entry
+              Create and Submit
             </Button>
           </Space>
         </div>
@@ -123,7 +134,7 @@ export function StockEntryForm() {
             type="info"
             showIcon
             className="form-helper-alert"
-            message="Use Allow Zero Valuation for rows that should post without an item valuation rate."
+            message="Use Allow Zero Valuation for rows that should post without an item valuation rate. The posting date must also fall inside an active ERPNext Fiscal Year."
           />
 
           <div className="stock-entry-form-grid">

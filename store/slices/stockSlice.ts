@@ -3,11 +3,20 @@
 import { createAsyncThunk, createEntityAdapter, createSlice } from "@reduxjs/toolkit";
 
 import { apiRequest, normalizeApiError } from "@/services/axiosInstance";
-import { stockEndpoints } from "@/store/api/stockEndpoints";
+import { masterDataEndpoints } from "@/services/endpoints";
+import { buildPagedParams, encodeFrappeJson, fetchAllFrappePages, fetchFrappeCount, parseFrappeNumber } from "@/services/frappe";
+import {
+  buildShortageRecord,
+  DEFAULT_STOCK_SHORTAGE_THRESHOLD,
+  isShortage,
+  resolveMinimumQuantity
+} from "@/services/stockLogic";
+import { invalidateStockSnapshots } from "@/store/actions/stockSync";
 import type { RootState } from "@/store";
 import type { FrappeListPayload, MasterDataRequestState } from "@/types/master-data";
 import type { LookupOption } from "@/types/item";
 import type {
+  FrappeSubmitDocumentPayload,
   DashboardModuleStatus,
   FrappeStockEntryDocumentPayload,
   FrappeStockEntryListPayload,
@@ -22,8 +31,8 @@ import type {
   StockEntryListRow,
   StockEntryLookups,
   StockState,
+  StockValueTrendPoint,
   StockSummary,
-  WarehouseStockPoint
 } from "@/types/stock";
 
 const stockEntryAdapter = createEntityAdapter<StockEntryListRow, string>({
@@ -63,22 +72,13 @@ const initialState: StockState = {
   },
   lookupsStatus: "idle",
   lookupsError: null,
-  hydratedEntries: []
-};
-
-const encodeFrappeJson = (value: unknown) => JSON.stringify(value);
-
-const parseNumber = (value: unknown) => {
-  if (typeof value === "number") {
-    return Number.isFinite(value) ? value : 0;
-  }
-
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-
-  return 0;
+  hydratedEntries: [],
+  stockEntriesPagination: {
+    current: 1,
+    pageSize: 20,
+    total: 0
+  },
+  stockDataVersion: 0
 };
 
 const monthKey = (dateValue?: string | null) => {
@@ -103,13 +103,50 @@ const aggregateMonthlyValues = <T extends Record<string, unknown>>(
 
   rows.forEach((row) => {
     const month = monthKey(typeof row[dateKey] === "string" ? row[dateKey] : undefined);
-    const amount = amountKeys.reduce((sum, key) => sum + parseNumber(row[key]), 0);
+    const amount = amountKeys.reduce((sum, key) => sum + parseFrappeNumber(row[key]), 0);
     totals.set(month, (totals.get(month) ?? 0) + amount);
   });
 
   return Array.from(totals.entries())
     .sort(([left], [right]) => left.localeCompare(right))
     .map(([month, value]) => ({ month, value }));
+};
+
+const aggregateDailyStockValueTrend = (
+  rows: Array<{
+    posting_date?: string | null;
+    stock_value_difference?: number | string | null;
+    actual_qty?: number | string | null;
+    valuation_rate?: number | string | null;
+  }>
+): StockValueTrendPoint[] => {
+  const dailyDeltas = new Map<string, number>();
+
+  rows.forEach((row) => {
+    const postingDate = row.posting_date?.trim();
+    if (!postingDate) {
+      return;
+    }
+
+    const delta =
+      parseFrappeNumber(row.stock_value_difference) ||
+      parseFrappeNumber(row.actual_qty) * parseFrappeNumber(row.valuation_rate);
+
+    dailyDeltas.set(postingDate, (dailyDeltas.get(postingDate) ?? 0) + delta);
+  });
+
+  let runningValue = 0;
+
+  return Array.from(dailyDeltas.entries())
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([date, dailyValue]) => {
+      runningValue += dailyValue;
+
+      return {
+        date,
+        value: runningValue
+      };
+    });
 };
 
 const isFulfilled = <T>(result: PromiseSettledResult<T>): result is PromiseFulfilledResult<T> => result.status === "fulfilled";
@@ -131,36 +168,58 @@ const mapLookupOptions = <T extends Record<string, unknown>>(rows: T[], key: key
     return options;
   }, []);
 
+const buildStockEntryFilters = (filters?: StockEntryFilters) => {
+  const queryFilters: unknown[][] = [];
+  const orFilters: unknown[][] = [];
+
+  if (filters?.fromDate?.trim()) {
+    queryFilters.push(["posting_date", ">=", filters.fromDate.trim()]);
+  }
+
+  if (filters?.toDate?.trim()) {
+    queryFilters.push(["posting_date", "<=", filters.toDate.trim()]);
+  }
+
+  if (filters?.search?.trim()) {
+    const token = `%${filters.search.trim()}%`;
+    orFilters.push(["name", "like", token]);
+    orFilters.push(["stock_entry_type", "like", token]);
+    orFilters.push(["purpose", "like", token]);
+  }
+
+  return { queryFilters, orFilters };
+};
+
 const createDashboardData = (args: {
-  items: Array<{ name: string; disabled?: 0 | 1 }>;
-  warehouses: Array<{ name: string }>;
-  bins: Array<{ warehouse?: string | null; stock_value?: number | string | null; actual_qty?: number | string | null; item_code?: string | null }>;
-  ledger: Array<{ name: string; item_code?: string | null; warehouse?: string | null; posting_date?: string | null; actual_qty?: number | string | null; valuation_rate?: number | string | null }>;
+  activeItemsCount: number;
+  warehousesCount: number;
+  bins: Array<{
+    warehouse?: string | null;
+    stock_value?: number | string | null;
+    actual_qty?: number | string | null;
+    item_code?: string | null;
+  }>;
+  ledger: Array<{
+    name: string;
+    item_code?: string | null;
+    warehouse?: string | null;
+    posting_date?: string | null;
+    actual_qty?: number | string | null;
+    valuation_rate?: number | string | null;
+    stock_value_difference?: number | string | null;
+  }>;
   purchaseReceipts: Array<{ posting_date?: string | null; grand_total?: number | string | null; base_grand_total?: number | string | null }>;
   deliveryNotes: Array<{ posting_date?: string | null; grand_total?: number | string | null; base_grand_total?: number | string | null }>;
   purchaseReceiptsReady: DashboardModuleStatus;
   deliveryNotesReady: DashboardModuleStatus;
 }): StockDashboardData => {
   const summary: StockSummary = {
-    activeItems: args.items.filter((item) => !item.disabled).length,
-    warehouses: args.warehouses.length,
-    totalStockValue: args.bins.reduce((sum, bin) => sum + parseNumber(bin.stock_value), 0)
+    activeItems: args.activeItemsCount,
+    warehouses: args.warehousesCount,
+    totalStockValue: args.bins.reduce((sum, bin) => sum + parseFrappeNumber(bin.stock_value), 0)
   };
 
-  const warehouseMap = new Map<string, number>();
-  args.bins.forEach((bin) => {
-    const warehouse = bin.warehouse?.trim();
-    if (!warehouse) {
-      return;
-    }
-
-    warehouseMap.set(warehouse, (warehouseMap.get(warehouse) ?? 0) + parseNumber(bin.stock_value));
-  });
-
-  const warehouseWiseStockValue: WarehouseStockPoint[] = Array.from(warehouseMap.entries())
-    .map(([warehouse, stockValue]) => ({ warehouse, stockValue }))
-    .sort((left, right) => right.stockValue - left.stockValue)
-    .slice(0, 8);
+  const warehouseStockTrend = aggregateDailyStockValueTrend(args.ledger);
 
   const purchaseReceiptTrends = aggregateMonthlyValues(args.purchaseReceipts, "posting_date", ["base_grand_total", "grand_total"]);
   const deliveryTrends = aggregateMonthlyValues(args.deliveryNotes, "posting_date", ["base_grand_total", "grand_total"]);
@@ -174,24 +233,34 @@ const createDashboardData = (args: {
       itemCode: entry.item_code ?? "Unknown Item",
       warehouse: entry.warehouse,
       postingDate: entry.posting_date,
-      actualQty: parseNumber(entry.actual_qty),
-      valuationRate: parseNumber(entry.valuation_rate)
+      actualQty: parseFrappeNumber(entry.actual_qty),
+      valuationRate: parseFrappeNumber(entry.valuation_rate)
     }));
 
   const shortageItems: ItemShortageRow[] = args.bins
-    .filter((bin) => parseNumber(bin.actual_qty) <= 0 && typeof bin.item_code === "string" && typeof bin.warehouse === "string")
-    .map((bin) => ({
-      itemCode: bin.item_code as string,
-      warehouse: bin.warehouse as string,
-      actualQty: parseNumber(bin.actual_qty),
-      shortageQty: Math.abs(parseNumber(bin.actual_qty))
-    }))
-    .sort((left, right) => left.actualQty - right.actualQty)
-    .slice(0, 8);
+    .filter((bin) => typeof bin.item_code === "string" && typeof bin.warehouse === "string")
+    .map((bin) => {
+      const actualQty = parseFrappeNumber(bin.actual_qty);
+      const minimumQty = resolveMinimumQuantity(undefined, DEFAULT_STOCK_SHORTAGE_THRESHOLD);
+      return {
+        actualQty,
+        minimumQty,
+        row: buildShortageRecord({
+          itemCode: bin.item_code as string,
+          warehouse: bin.warehouse as string,
+          actualQty,
+          minimumQty
+        })
+      };
+    })
+    .filter((entry) => isShortage(entry.actualQty, entry.minimumQty))
+    .sort((left, right) => left.row.shortageQty - right.row.shortageQty)
+    .slice(0, 8)
+    .map((entry) => entry.row);
 
   return {
     summary,
-    warehouseWiseStockValue,
+    warehouseStockTrend,
     purchaseReceiptTrends,
     deliveryTrends,
     oldestItems,
@@ -207,75 +276,67 @@ export const fetchDashboardData = createAsyncThunk<StockDashboardData, void, { r
   "stock/fetchDashboardData",
   async (_arg, thunkApi) => {
     try {
-      const results = await Promise.allSettled([
-        apiRequest<FrappeListPayload<{ name: string; disabled?: 0 | 1 }>>({
-          url: stockEndpoints.item.list,
-          method: "GET",
-          params: {
-            fields: encodeFrappeJson(["name", "disabled"]),
-            limit_page_length: 1000
-          }
+      const activeItemFilters: unknown[][] = [["disabled", "=", 0]];
+      const [activeItemsCount, warehousesCount, bins, ledger, purchaseReceiptResult, deliveryNoteResult] = await Promise.all([
+        fetchFrappeCount({
+          url: masterDataEndpoints.item.list,
+          filters: activeItemFilters
         }),
-        apiRequest<FrappeListPayload<{ name: string }>>({
-          url: stockEndpoints.warehouse.list,
-          method: "GET",
-          params: {
-            fields: encodeFrappeJson(["name"]),
-            limit_page_length: 1000
-          }
+        fetchFrappeCount({
+          url: masterDataEndpoints.warehouse.list
         }),
-        apiRequest<FrappeListPayload<{ warehouse?: string | null; stock_value?: number | string | null; actual_qty?: number | string | null; item_code?: string | null }>>({
-          url: stockEndpoints.bin.list,
-          method: "GET",
-          params: {
-            fields: encodeFrappeJson(["warehouse", "stock_value", "actual_qty", "item_code"]),
-            limit_page_length: 1000
-          }
+        fetchAllFrappePages<{
+          warehouse?: string | null;
+          stock_value?: number | string | null;
+          actual_qty?: number | string | null;
+          item_code?: string | null;
+        }>({
+          url: masterDataEndpoints.stock.bin,
+          fields: ["warehouse", "stock_value", "actual_qty", "item_code"],
+          orderBy: "warehouse asc, item_code asc"
         }),
-        apiRequest<FrappeListPayload<{ name: string; item_code?: string | null; warehouse?: string | null; posting_date?: string | null; actual_qty?: number | string | null; valuation_rate?: number | string | null }>>({
-          url: stockEndpoints.stockLedgerEntry.list,
-          method: "GET",
-          params: {
-            fields: encodeFrappeJson(["name", "item_code", "warehouse", "posting_date", "actual_qty", "valuation_rate"]),
-            order_by: "posting_date asc",
-            limit_page_length: 12
-          }
+        fetchAllFrappePages<{
+          name: string;
+          item_code?: string | null;
+          warehouse?: string | null;
+          posting_date?: string | null;
+          actual_qty?: number | string | null;
+          valuation_rate?: number | string | null;
+          stock_value_difference?: number | string | null;
+        }>({
+          url: masterDataEndpoints.stock.stockLedgerEntry,
+          fields: ["name", "item_code", "warehouse", "posting_date", "actual_qty", "valuation_rate", "stock_value_difference"],
+          orderBy: "posting_date asc, creation asc"
         }),
         apiRequest<FrappeListPayload<{ posting_date?: string | null; grand_total?: number | string | null; base_grand_total?: number | string | null }>>({
-          url: stockEndpoints.purchaseReceipt.list,
+          url: masterDataEndpoints.stock.purchaseReceipt,
           method: "GET",
           params: {
             fields: encodeFrappeJson(["posting_date", "grand_total", "base_grand_total"]),
             order_by: "posting_date asc",
             limit_page_length: 500
           }
-        }),
+        }).catch(() => ({ data: [] })),
         apiRequest<FrappeListPayload<{ posting_date?: string | null; grand_total?: number | string | null; base_grand_total?: number | string | null }>>({
-          url: stockEndpoints.deliveryNote.list,
+          url: masterDataEndpoints.stock.deliveryNote,
           method: "GET",
           params: {
             fields: encodeFrappeJson(["posting_date", "grand_total", "base_grand_total"]),
             order_by: "posting_date asc",
             limit_page_length: 500
           }
-        })
+        }).catch(() => ({ data: [] }))
       ]);
 
-      const [itemsResult, warehousesResult, binsResult, ledgerResult, purchaseReceiptResult, deliveryNoteResult] = results;
-
-      if (!isFulfilled(itemsResult) || !isFulfilled(warehousesResult) || !isFulfilled(binsResult) || !isFulfilled(ledgerResult)) {
-        return thunkApi.rejectWithValue("Unable to fetch core stock dashboard data.");
-      }
-
       return createDashboardData({
-        items: itemsResult.value.data ?? [],
-        warehouses: warehousesResult.value.data ?? [],
-        bins: binsResult.value.data ?? [],
-        ledger: ledgerResult.value.data ?? [],
-        purchaseReceipts: isFulfilled(purchaseReceiptResult) ? purchaseReceiptResult.value.data ?? [] : [],
-        deliveryNotes: isFulfilled(deliveryNoteResult) ? deliveryNoteResult.value.data ?? [] : [],
-        purchaseReceiptsReady: isFulfilled(purchaseReceiptResult) ? "ready" : "partial",
-        deliveryNotesReady: isFulfilled(deliveryNoteResult) ? "ready" : "partial"
+        activeItemsCount,
+        warehousesCount,
+        bins,
+        ledger,
+        purchaseReceipts: purchaseReceiptResult.data ?? [],
+        deliveryNotes: deliveryNoteResult.data ?? [],
+        purchaseReceiptsReady: "ready",
+        deliveryNotesReady: "ready"
       });
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to fetch stock dashboard.").message);
@@ -289,7 +350,7 @@ export const fetchStockEntryLookups = createAsyncThunk<StockEntryLookups, void, 
     try {
       const [stockEntryTypeResult, itemResult, warehouseResult] = await Promise.allSettled([
         apiRequest<FrappeListPayload<{ name: string }>>({
-          url: stockEndpoints.stockEntryType.list,
+          url: masterDataEndpoints.stock.stockEntryType,
           method: "GET",
           params: {
             fields: encodeFrappeJson(["name"]),
@@ -297,23 +358,16 @@ export const fetchStockEntryLookups = createAsyncThunk<StockEntryLookups, void, 
             limit_page_length: 100
           }
         }),
-        apiRequest<FrappeListPayload<{ name: string; item_name?: string | null }>>({
-          url: stockEndpoints.item.list,
-          method: "GET",
-          params: {
-            fields: encodeFrappeJson(["name", "item_name"]),
-            order_by: "item_name asc",
-            limit_page_length: 1000
-          }
+        fetchAllFrappePages<{ name: string; item_name?: string | null }>({
+          url: masterDataEndpoints.item.list,
+          fields: ["name", "item_name"],
+          orderBy: "item_name asc"
         }),
-        apiRequest<FrappeListPayload<{ name: string; warehouse_name?: string | null }>>({
-          url: stockEndpoints.warehouse.list,
-          method: "GET",
-          params: {
-            fields: encodeFrappeJson(["name", "warehouse_name"]),
-            order_by: "warehouse_name asc",
-            limit_page_length: 1000
-          }
+        fetchAllFrappePages<{ name: string; warehouse_name?: string | null }>({
+          url: masterDataEndpoints.warehouse.list,
+          fields: ["name", "warehouse_name"],
+          filters: [["is_group", "=", 0]],
+          orderBy: "warehouse_name asc"
         })
       ]);
 
@@ -327,8 +381,8 @@ export const fetchStockEntryLookups = createAsyncThunk<StockEntryLookups, void, 
 
       return {
         stockEntryTypes: stockEntryTypes.length > 0 ? stockEntryTypes : ERP_NEXT_STOCK_ENTRY_TYPES,
-        items: mapLookupOptions(itemResult.value.data ?? [], "name", "item_name"),
-        warehouses: mapLookupOptions(warehouseResult.value.data ?? [], "name", "warehouse_name")
+        items: mapLookupOptions(itemResult.value ?? [], "name", "item_name"),
+        warehouses: mapLookupOptions(warehouseResult.value ?? [], "name", "warehouse_name")
       };
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to fetch stock entry lookups.").message);
@@ -336,43 +390,53 @@ export const fetchStockEntryLookups = createAsyncThunk<StockEntryLookups, void, 
   }
 );
 
-export const fetchStockEntries = createAsyncThunk<StockEntryListRow[], StockEntryFilters | void, { rejectValue: string }>(
+export const fetchStockEntries = createAsyncThunk<
+  { rows: StockEntryListRow[]; total: number; page: number; pageSize: number },
+  StockEntryFilters | void,
+  { rejectValue: string }
+>(
   "stock/fetchStockEntries",
   async (filters, thunkApi) => {
     try {
-      const rows = await apiRequest<FrappeStockEntryListPayload>({
-        url: stockEndpoints.stockEntry.list,
-        method: "GET",
-        params: {
-          fields: encodeFrappeJson([
-            "name",
-            "stock_entry_type",
+      const page = filters?.page ?? 1;
+      const pageSize = filters?.pageSize ?? 20;
+      const { queryFilters, orFilters } = buildStockEntryFilters(filters ?? undefined);
+      const [total, rows] = await Promise.all([
+        fetchFrappeCount({
+          url: masterDataEndpoints.stock.stockEntry,
+          filters: queryFilters,
+          orFilters: orFilters.length ? orFilters : undefined
+        }),
+        apiRequest<FrappeStockEntryListPayload>({
+          url: masterDataEndpoints.stock.stockEntry,
+          method: "GET",
+          params: buildPagedParams({
+            fields: [
+              "name",
+              "stock_entry_type",
             "purpose",
             "posting_date",
             "posting_time",
+            "docstatus",
             "total_outgoing_value",
             "total_incoming_value",
             "modified"
-          ]),
-          order_by: "posting_date desc, modified desc",
-          limit_page_length: 200
-        }
-      });
+            ],
+            filters: queryFilters,
+            orFilters,
+            orderBy: "posting_date desc, modified desc",
+            page,
+            pageSize
+          })
+        })
+      ]);
 
-      const search = filters?.search?.trim().toLowerCase();
-      const fromDate = filters?.fromDate;
-      const toDate = filters?.toDate;
-
-      return (rows.data ?? []).filter((entry) => {
-        const matchesSearch = search
-          ? [entry.name, entry.stock_entry_type ?? "", entry.purpose ?? "", ...(entry.itemCodes ?? [])].some((value) =>
-              value.toLowerCase().includes(search)
-            )
-          : true;
-        const matchesFrom = fromDate ? `${entry.posting_date ?? ""}` >= fromDate : true;
-        const matchesTo = toDate ? `${entry.posting_date ?? ""}` <= toDate : true;
-        return matchesSearch && matchesFrom && matchesTo;
-      });
+      return {
+        rows: rows.data ?? [],
+        total,
+        page,
+        pageSize
+      };
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to fetch stock entries.").message);
     }
@@ -384,7 +448,7 @@ export const fetchStockEntryDetail = createAsyncThunk<StockEntryDocument, string
   async (name, thunkApi) => {
     try {
       const payload = await apiRequest<FrappeStockEntryDocumentPayload>({
-        url: stockEndpoints.stockEntry.detail(name),
+        url: `${masterDataEndpoints.stock.stockEntry}/${encodeURIComponent(name)}`,
         method: "GET"
       });
       return payload.data;
@@ -409,10 +473,14 @@ export const hydrateStockEntryItems = createAsyncThunk<
       const existing = new Set(state.stock.hydratedEntries);
       const queue = (names ?? selectAllStockEntries(state).map((entry) => entry.name).slice(0, 24)).filter((name) => !existing.has(name));
 
-      const results = await Promise.allSettled(queue.map((name) => apiRequest<FrappeStockEntryDocumentPayload>({
-        url: stockEndpoints.stockEntry.detail(name),
-        method: "GET"
-      })));
+      const results = await Promise.allSettled(
+        queue.map((name) =>
+          apiRequest<FrappeStockEntryDocumentPayload>({
+            url: `${masterDataEndpoints.stock.stockEntry}/${encodeURIComponent(name)}`,
+            method: "GET"
+          })
+        )
+      );
 
       return results
         .map((result, index) => ({ result, name: queue[index] }))
@@ -431,8 +499,8 @@ export const createStockEntry = createAsyncThunk<StockEntryDocument, StockEntryC
   "stock/createStockEntry",
   async (values, thunkApi) => {
     try {
-      const payload = await apiRequest<FrappeStockEntryDocumentPayload>({
-        url: stockEndpoints.stockEntry.list,
+      const created = await apiRequest<FrappeStockEntryDocumentPayload>({
+        url: masterDataEndpoints.stock.stockEntry,
         method: "POST",
         data: {
           stock_entry_type: values.stock_entry_type,
@@ -440,19 +508,59 @@ export const createStockEntry = createAsyncThunk<StockEntryDocument, StockEntryC
           posting_time: values.posting_time,
           items: values.items.map((item) => ({
             item_code: item.item_code,
-            qty: parseNumber(item.qty),
+            qty: parseFrappeNumber(item.qty),
             s_warehouse: item.source_warehouse || undefined,
             t_warehouse: item.target_warehouse || undefined,
-            basic_rate: item.basic_rate != null ? parseNumber(item.basic_rate) : undefined,
-            valuation_rate: item.basic_rate != null ? parseNumber(item.basic_rate) : undefined,
+            basic_rate: item.basic_rate != null ? parseFrappeNumber(item.basic_rate) : undefined,
+            valuation_rate: item.basic_rate != null ? parseFrappeNumber(item.basic_rate) : undefined,
             allow_zero_valuation_rate: item.allow_zero_valuation_rate ? 1 : 0
           }))
         }
       });
 
-      return payload.data;
+      const submitWithPayload = async (doc: unknown) =>
+        apiRequest<FrappeSubmitDocumentPayload>({
+          url: "/method/frappe.client.submit",
+          method: "POST",
+          data: { doc }
+        });
+
+      const fetchCurrentDocument = async () =>
+        apiRequest<FrappeStockEntryDocumentPayload>({
+          url: `${masterDataEndpoints.stock.stockEntry}/${encodeURIComponent(created.data.name)}`,
+          method: "GET"
+        });
+
+      let submitted: FrappeSubmitDocumentPayload | null = null;
+
+      try {
+        submitted = await submitWithPayload(created.data);
+      } catch (firstSubmitError) {
+        const current = await fetchCurrentDocument().catch(() => null);
+        if (current?.data?.docstatus === 1) {
+          thunkApi.dispatch(invalidateStockSnapshots());
+          return current.data;
+        }
+
+        try {
+          submitted = await submitWithPayload(JSON.stringify(created.data));
+        } catch (secondSubmitError) {
+          const afterRetry = await fetchCurrentDocument().catch(() => null);
+          if (afterRetry?.data?.docstatus === 1) {
+            thunkApi.dispatch(invalidateStockSnapshots());
+            return afterRetry.data;
+          }
+
+          return thunkApi.rejectWithValue(
+            normalizeApiError(secondSubmitError, "Unable to submit stock entry.").message
+          );
+        }
+      }
+
+      thunkApi.dispatch(invalidateStockSnapshots());
+      return submitted.message;
     } catch (error) {
-      return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to create stock entry.").message);
+      return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to create and submit stock entry.").message);
     }
   }
 );
@@ -493,7 +601,12 @@ const stockSlice = createSlice({
       })
       .addCase(fetchStockEntries.fulfilled, (state, action) => {
         state.stockEntriesStatus = "succeeded";
-        stockEntryAdapter.setAll(state.stockEntries, action.payload);
+        state.stockEntriesPagination = {
+          current: action.payload.page,
+          pageSize: action.payload.pageSize,
+          total: action.payload.total
+        };
+        stockEntryAdapter.setAll(state.stockEntries, action.payload.rows);
       })
       .addCase(fetchStockEntries.rejected, (state, action) => {
         state.stockEntriesStatus = "failed";
@@ -539,6 +652,7 @@ const stockSlice = createSlice({
           purpose: action.payload.purpose,
           posting_date: action.payload.posting_date,
           posting_time: action.payload.posting_time,
+          docstatus: action.payload.docstatus,
           total_outgoing_value: action.payload.total_outgoing_value,
           total_incoming_value: action.payload.total_incoming_value,
           modified: action.payload.modified,
@@ -549,6 +663,10 @@ const stockSlice = createSlice({
       .addCase(createStockEntry.rejected, (state, action) => {
         state.createStatus = "failed";
         state.createError = action.payload ?? "Unable to create stock entry.";
+      })
+      .addCase(invalidateStockSnapshots, (state) => {
+        state.stockDataVersion += 1;
+        state.dashboardStatus = "idle";
       });
   }
 });

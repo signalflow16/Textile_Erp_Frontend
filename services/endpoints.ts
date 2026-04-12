@@ -41,5 +41,13 @@ export const masterDataEndpoints = {
   },
   company: {
     list: resourcePath("Company")
+  },
+  stock: {
+    bin: resourcePath("Bin"),
+    stockEntry: resourcePath("Stock Entry"),
+    stockLedgerEntry: resourcePath("Stock Ledger Entry"),
+    stockEntryType: resourcePath("Stock Entry Type"),
+    purchaseReceipt: resourcePath("Purchase Receipt"),
+    deliveryNote: resourcePath("Delivery Note")
   }
 };

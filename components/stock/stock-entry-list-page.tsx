@@ -30,6 +30,18 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
   maximumFractionDigits: 0
 });
 
+const docstatusLabel = (docstatus?: 0 | 1 | 2 | null) => {
+  if (docstatus === 1) {
+    return { color: "success" as const, text: "Submitted" };
+  }
+
+  if (docstatus === 2) {
+    return { color: "default" as const, text: "Cancelled" };
+  }
+
+  return { color: "warning" as const, text: "Draft" };
+};
+
 export function StockEntryListPage() {
   const dispatch = useAppDispatch();
   const entries = useAppSelector(selectAllStockEntries);
@@ -37,6 +49,8 @@ export function StockEntryListPage() {
   const [search, setSearch] = useState("");
   const [dates, setDates] = useState<DateFilterValue>(null);
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
   const deferredSearch = useDeferredValue(search);
   const detail = useAppSelector((state) => (selectedEntry ? selectStockEntryDetail(state, selectedEntry) : undefined));
   const detailStatus = useAppSelector((state) =>
@@ -46,11 +60,18 @@ export function StockEntryListPage() {
   useEffect(() => {
     void dispatch(
       fetchStockEntries({
+        search: deferredSearch,
         fromDate: dates?.[0]?.format("YYYY-MM-DD"),
-        toDate: dates?.[1]?.format("YYYY-MM-DD")
+        toDate: dates?.[1]?.format("YYYY-MM-DD"),
+        page,
+        pageSize
       })
     );
-  }, [dates, dispatch]);
+  }, [dates, deferredSearch, dispatch, page, pageSize, stockState.stockDataVersion]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [dates, deferredSearch]);
 
   useEffect(() => {
     if (stockState.stockEntriesStatus === "succeeded" && entries.length > 0) {
@@ -64,20 +85,6 @@ export function StockEntryListPage() {
     }
   }, [detailStatus, dispatch, selectedEntry]);
 
-  const filteredEntries = useMemo(() => {
-    const query = deferredSearch.trim().toLowerCase();
-
-    if (!query) {
-      return entries;
-    }
-
-    return entries.filter((entry) =>
-      [entry.name, entry.stock_entry_type ?? "", entry.purpose ?? "", ...(entry.itemCodes ?? [])].some((value) =>
-        value.toLowerCase().includes(query)
-      )
-    );
-  }, [deferredSearch, entries]);
-
   const columns = useMemo<ColumnsType<StockEntryListRow>>(
     () => [
       {
@@ -88,6 +95,9 @@ export function StockEntryListPage() {
           <Space direction="vertical" size={2}>
             <Text strong>{value}</Text>
             <Text type="secondary">{record.stock_entry_type || record.purpose || "Stock Entry"}</Text>
+            <Tag bordered={false} color={docstatusLabel(record.docstatus).color}>
+              {docstatusLabel(record.docstatus).text}
+            </Tag>
           </Space>
         )
       },
@@ -156,17 +166,31 @@ export function StockEntryListPage() {
       </div>
 
       <div className="master-summary-bar">
-        <Tag color="processing" bordered={false}>
-          {filteredEntries.length} entries
-        </Tag>
+        <Space>
+          <Tag color="processing" bordered={false}>
+            {stockState.stockEntriesPagination.total} entries
+          </Tag>
+          <Text type="secondary">Only submitted entries update warehouse stock, the dashboard, and Bin balances.</Text>
+        </Space>
       </div>
 
       <div className="item-list-card">
         <DataTable
           rowKey={(record) => record.name}
           columns={columns}
-          dataSource={filteredEntries}
+          dataSource={entries}
           loading={stockState.stockEntriesStatus === "loading"}
+          pagination={{
+            current: page,
+            pageSize,
+            total: stockState.stockEntriesPagination.total,
+            showSizeChanger: true,
+            pageSizeOptions: [20, 50, 100].map(String)
+          }}
+          onChange={(pagination) => {
+            setPage(pagination.current ?? 1);
+            setPageSize(pagination.pageSize ?? 20);
+          }}
         />
       </div>
 
@@ -188,6 +212,10 @@ export function StockEntryListPage() {
               <div>
                 <Text type="secondary">Posting</Text>
                 <div>{detail.posting_date || "-"} {detail.posting_time || ""}</div>
+              </div>
+              <div>
+                <Text type="secondary">Status</Text>
+                <div>{docstatusLabel(detail.docstatus).text}</div>
               </div>
             </div>
             <Table

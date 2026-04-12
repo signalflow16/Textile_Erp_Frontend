@@ -42,8 +42,34 @@ export function StockItemsPage() {
   }, [dispatch, itemsState.lookupsStatus]);
 
   useEffect(() => {
-    void dispatch(fetchItems({ search: deferredSearch, itemGroup }));
-  }, [deferredSearch, dispatch, itemGroup]);
+    if (itemsState.pagination.current !== 1) {
+      return;
+    }
+
+    void dispatch(
+      fetchItems({
+        search: deferredSearch,
+        itemGroup,
+        page: itemsState.pagination.current,
+        pageSize: itemsState.pagination.pageSize
+      })
+    );
+  }, [deferredSearch, dispatch, itemGroup, itemsState.pagination.current, itemsState.pagination.pageSize]);
+
+  useEffect(() => {
+    if (itemsState.pagination.current === 1) {
+      return;
+    }
+
+    void dispatch(
+      fetchItems({
+        search: deferredSearch,
+        itemGroup,
+        page: 1,
+        pageSize: itemsState.pagination.pageSize
+      })
+    );
+  }, [deferredSearch, dispatch, itemGroup, itemsState.pagination.current, itemsState.pagination.pageSize]);
 
   const columns = useMemo<ColumnsType<ItemMasterRow>>(
     () => [
@@ -91,18 +117,6 @@ export function StockItemsPage() {
     []
   );
 
-  const filteredItems = useMemo(
-    () =>
-      items.filter((item) => {
-        const matchesSearch = deferredSearch.trim()
-          ? [item.item_code, item.item_name ?? ""].some((value) => value.toLowerCase().includes(deferredSearch.trim().toLowerCase()))
-          : true;
-        const matchesGroup = itemGroup ? item.item_group === itemGroup : true;
-        return matchesSearch && matchesGroup;
-      }),
-    [deferredSearch, itemGroup, items]
-  );
-
   const handleCreate = async () => {
     try {
       const values = await form.validateFields();
@@ -110,7 +124,6 @@ export function StockItemsPage() {
       message.success("Item created successfully.");
       form.resetFields();
       setModalOpen(false);
-      void dispatch(fetchItems({ search: deferredSearch, itemGroup }));
     } catch (error) {
       if (typeof error === "object" && error && "errorFields" in error) {
         return;
@@ -153,7 +166,7 @@ export function StockItemsPage() {
       <div className="master-summary-bar">
         <Space>
           <Tag color="processing" bordered={false}>
-            {filteredItems.length} items
+            {itemsState.pagination.total} items
           </Tag>
           <Text type="secondary">Live stock item records from your ERP workspace.</Text>
         </Space>
@@ -163,8 +176,25 @@ export function StockItemsPage() {
         <DataTable
           rowKey={(record) => record.name}
           columns={columns}
-          dataSource={filteredItems}
+          dataSource={items}
           loading={itemsState.fetchStatus === "loading"}
+          pagination={{
+            current: itemsState.pagination.current,
+            pageSize: itemsState.pagination.pageSize,
+            total: itemsState.pagination.total,
+            showSizeChanger: true,
+            pageSizeOptions: [20, 50, 100].map(String)
+          }}
+          onChange={(pagination) => {
+            void dispatch(
+              fetchItems({
+                search: deferredSearch,
+                itemGroup,
+                page: pagination.current ?? 1,
+                pageSize: pagination.pageSize ?? 20
+              })
+            );
+          }}
         />
       </div>
 

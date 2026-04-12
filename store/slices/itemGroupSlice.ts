@@ -10,6 +10,7 @@ import {
 } from "@reduxjs/toolkit";
 
 import { apiRequest, normalizeApiError } from "@/services/axiosInstance";
+import { fetchAllFrappePages } from "@/services/frappe";
 import { itemGroupEndpoints } from "@/store/api/itemGroupEndpoints";
 import type { RootState } from "@/store";
 import type { FrappeDocumentPayload, FrappeListPayload } from "@/types/master-data";
@@ -123,24 +124,13 @@ export const fetchItemGroups = createAsyncThunk<ItemGroupDocument[], void, { rej
   "itemGroups/fetchItemGroups",
   async (_arg, thunkApi) => {
     try {
-      const payload = await apiRequest<FrappeListPayload<ItemGroupResourceRecord>>({
+      const rows = await fetchAllFrappePages<ItemGroupResourceRecord>({
         url: itemGroupEndpoints.list,
-        method: "GET",
-        params: {
-          fields: encodeFrappeJson([
-            "name",
-            "item_group_name",
-            "parent_item_group",
-            "is_group",
-            "modified",
-            "creation"
-          ]),
-          order_by: "item_group_name asc",
-          limit_page_length: 500
-        }
+        fields: ["name", "item_group_name", "parent_item_group", "is_group", "modified", "creation"],
+        orderBy: "item_group_name asc"
       });
 
-      return (payload.data ?? []).map(normalizeGroupRecord);
+      return rows.map(normalizeGroupRecord);
     } catch (error) {
       return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to fetch item groups.").message);
     }

@@ -62,7 +62,6 @@ export function useItemGroupWorkspace(defaultSelectedGroup?: string) {
   useEffect(() => {
     if (defaultSelectedGroup) {
       dispatch(setSelectedGroup(defaultSelectedGroup));
-      void dispatch(fetchItemGroupDetail(defaultSelectedGroup));
     }
   }, [defaultSelectedGroup, dispatch]);
 

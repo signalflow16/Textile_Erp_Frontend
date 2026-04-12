@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, Empty, Tag, Typography } from "antd";
+import type { ReactNode } from "react";
+import { Card, Empty, Skeleton, Tag, Typography } from "antd";
 
 const { Text } = Typography;
 
@@ -10,14 +11,20 @@ export function ChartCard({
   status,
   statusText,
   children,
-  empty
+  empty,
+  loading,
+  emptyText,
+  extra
 }: {
   title: string;
   subtitle?: string;
   status?: "default" | "processing" | "warning";
   statusText?: string;
-  children: React.ReactNode;
+  children: ReactNode;
   empty?: boolean;
+  loading?: boolean;
+  emptyText?: string;
+  extra?: ReactNode;
 }) {
   return (
     <Card
@@ -32,9 +39,26 @@ export function ChartCard({
           ) : null}
         </div>
       }
-      extra={subtitle ? <Text type="secondary">{subtitle}</Text> : null}
+      extra={
+        extra ?? (subtitle ? <Text type="secondary">{subtitle}</Text> : null)
+      }
     >
-      {empty ? <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No data available." /> : children}
+      <div className="stock-chart-card-body">
+        {loading ? (
+          <div className="stock-chart-state">
+            <Skeleton active paragraph={{ rows: 8 }} title={false} />
+          </div>
+        ) : empty ? (
+          <div className="stock-chart-state">
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={emptyText ?? "No data available yet. Data will appear once transactions are recorded."}
+            />
+          </div>
+        ) : (
+          children
+        )}
+      </div>
     </Card>
   );
 }

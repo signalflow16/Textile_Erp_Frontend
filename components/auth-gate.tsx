@@ -79,13 +79,13 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
 
     if (isPublicRoute && me) {
-      router.replace("/stock/items");
+      router.replace("/stock");
       return;
     }
 
     const isVerifying = authMeState.isFetching;
     if (!isPublicRoute && !me && !isVerifying) {
-      const redirectTo = pathname || "/stock/items";
+      const redirectTo = pathname || "/stock";
       router.replace(`/signin?redirect=${encodeURIComponent(redirectTo)}`);
     }
   }, [

@@ -2,6 +2,7 @@ import type { EntityState } from "@reduxjs/toolkit";
 
 import type { LookupOption } from "@/types/item";
 import type { FrappeDocumentPayload, FrappeListPayload, MasterDataRequestState } from "@/types/master-data";
+import type { FrappeMessageResponse } from "@/types/frappe";
 
 export type StockSummary = {
   activeItems: number;
@@ -12,6 +13,11 @@ export type StockSummary = {
 export type WarehouseStockPoint = {
   warehouse: string;
   stockValue: number;
+};
+
+export type StockValueTrendPoint = {
+  date: string;
+  value: number;
 };
 
 export type MonthlyTrendPoint = {
@@ -39,7 +45,7 @@ export type DashboardModuleStatus = "ready" | "partial";
 
 export type StockDashboardData = {
   summary: StockSummary;
-  warehouseWiseStockValue: WarehouseStockPoint[];
+  warehouseStockTrend: StockValueTrendPoint[];
   purchaseReceiptTrends: MonthlyTrendPoint[];
   deliveryTrends: MonthlyTrendPoint[];
   oldestItems: OldestStockItem[];
@@ -56,6 +62,7 @@ export type StockEntryListRow = {
   purpose?: string | null;
   posting_date?: string | null;
   posting_time?: string | null;
+  docstatus?: 0 | 1 | 2 | null;
   total_outgoing_value?: number | null;
   total_incoming_value?: number | null;
   modified?: string | null;
@@ -79,6 +86,7 @@ export type StockEntryDocument = {
   purpose?: string | null;
   posting_date?: string | null;
   posting_time?: string | null;
+  docstatus?: 0 | 1 | 2 | null;
   items?: StockEntryItemRow[];
   total_outgoing_value?: number | null;
   total_incoming_value?: number | null;
@@ -111,6 +119,14 @@ export type StockEntryFilters = {
   search?: string;
   fromDate?: string;
   toDate?: string;
+  page?: number;
+  pageSize?: number;
+};
+
+export type StockEntryPagination = {
+  current: number;
+  pageSize: number;
+  total: number;
 };
 
 export type StockState = {
@@ -129,7 +145,10 @@ export type StockState = {
   lookupsStatus: MasterDataRequestState;
   lookupsError: string | null;
   hydratedEntries: string[];
+  stockEntriesPagination: StockEntryPagination;
+  stockDataVersion: number;
 };
 
 export type FrappeStockEntryListPayload = FrappeListPayload<StockEntryListRow>;
 export type FrappeStockEntryDocumentPayload = FrappeDocumentPayload<StockEntryDocument>;
+export type FrappeSubmitDocumentPayload = FrappeMessageResponse<StockEntryDocument>;
