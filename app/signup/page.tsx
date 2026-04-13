@@ -73,13 +73,17 @@ export default function SignUpPage() {
       }
 
       const meResponse = await triggerAuthMe().unwrap();
-      if (!meResponse.ok) {
-        dispatch(clearAuth());
-        setErrorMessage(getFailureMessage(meResponse, "Unable to validate signed-in account."));
-        return;
+      if (meResponse.ok) {
+        dispatch(setAuthMe(meResponse.data));
+      } else {
+        // Fallback for sites where the profile method is restricted/non-whitelisted.
+        dispatch(
+          setAuthMe({
+            user_id: values.email,
+            email: values.email
+          })
+        );
       }
-
-      dispatch(setAuthMe(meResponse.data));
       router.replace("/stock/items");
     } catch (error) {
       setErrorMessage(extractApiErrorMessage(error, "Unable to complete owner signup."));

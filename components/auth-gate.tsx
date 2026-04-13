@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { Alert, Spin } from "antd";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Alert, Button, Spin } from "antd";
 
 import { clearAuthTokens } from "@/lib/auth-storage";
 import {
@@ -19,15 +19,33 @@ const PUBLIC_ROUTES = ["/signin", "/signup"];
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { me, hydrated } = useAppSelector((state) => state.auth);
   const [triggerAuthMe, authMeState] = useLazyAuthMeQuery();
   const authRequestedRef = useRef(false);
+  const [retryNonce, setRetryNonce] = useState(0);
   const isPublicRoute = useMemo(
     () => (pathname ? PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) : false),
     [pathname]
   );
+  const authErrorStatus = (() => {
+    if (!authMeState.error || typeof authMeState.error !== "object") {
+      return null;
+    }
+
+    const statusValue = (authMeState.error as { status?: unknown }).status;
+    return typeof statusValue === "number" ? statusValue : null;
+  })();
+  const isSessionInvalid =
+    authErrorStatus === 401 ||
+    authErrorStatus === 403 ||
+    (Boolean(authMeState.data) && authMeState.data?.ok === false);
+  const hasAuthCheckCompleted = Boolean(me) || (authRequestedRef.current && !authMeState.isFetching);
+  const isVerifying = !isPublicRoute && !me && !hasAuthCheckCompleted;
+  const isSessionExpired = !isPublicRoute && !me && hasAuthCheckCompleted && isSessionInvalid;
+  const hasAuthCheckError = !isPublicRoute && !me && hasAuthCheckCompleted && Boolean(authMeState.error) && !isSessionInvalid;
 
   useEffect(() => {
     if (hydrated) {
@@ -44,7 +62,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
 
     authRequestedRef.current = true;
     void triggerAuthMe();
-  }, [authMeState.isFetching, hydrated, me, triggerAuthMe]);
+  }, [authMeState.isFetching, hydrated, me, triggerAuthMe, retryNonce]);
 
   useEffect(() => {
     if (!authMeState.data) {
@@ -65,13 +83,21 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Ignore stale authMe errors if the app already has an authenticated user profile.
+    if (me) {
+      return;
+    }
+
     if (isPublicRoute) {
       return;
     }
 
-    dispatch(clearAuth());
-    clearAuthTokens();
-  }, [authMeState.error, dispatch, isPublicRoute]);
+    // Only clear auth when backend confirms session is invalid.
+    if (authErrorStatus === 401 || authErrorStatus === 403) {
+      dispatch(clearAuth());
+      clearAuthTokens();
+    }
+  }, [authErrorStatus, authMeState.error, dispatch, isPublicRoute, me]);
 
   useEffect(() => {
     if (!hydrated) {
@@ -79,21 +105,28 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
 
     if (isPublicRoute && me) {
-      router.replace("/stock/items");
+      const requestedRedirect = searchParams.get("redirect");
+      const safeRedirect =
+        requestedRedirect && requestedRedirect.startsWith("/") ? requestedRedirect : "/stock/items";
+      router.replace(safeRedirect);
       return;
     }
 
-    const isVerifying = authMeState.isFetching;
-    if (!isPublicRoute && !me && !isVerifying) {
+    if (!isPublicRoute && !me && hasAuthCheckCompleted && isSessionInvalid) {
       const redirectTo = pathname || "/stock/items";
-      router.replace(`/signin?redirect=${encodeURIComponent(redirectTo)}`);
+      const timer = window.setTimeout(() => {
+        router.replace(`/signin?redirect=${encodeURIComponent(redirectTo)}`);
+      }, 900);
+      return () => window.clearTimeout(timer);
     }
   }, [
-    authMeState.isFetching,
+    hasAuthCheckCompleted,
     hydrated,
     isPublicRoute,
+    isSessionInvalid,
     me,
     pathname,
+    searchParams,
     router
   ]);
 
@@ -105,7 +138,6 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isVerifying = !isPublicRoute && !me && authMeState.isFetching;
   if (isVerifying) {
     return (
       <div className="centered-state">
@@ -119,6 +151,43 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   if (!me) {
+    if (isSessionExpired) {
+      return (
+        <div className="page-shell">
+          <Alert
+            type="warning"
+            message="Session expired"
+            description="Your ERPNext session has expired. Redirecting to sign in..."
+            showIcon
+          />
+        </div>
+      );
+    }
+
+    if (hasAuthCheckError) {
+      return (
+        <div className="page-shell">
+          <Alert
+            type="error"
+            message="Unable to verify session"
+            description="Could not validate your login session. Check ERPNext connectivity and retry."
+            showIcon
+            action={
+              <Button
+                size="small"
+                onClick={() => {
+                  authRequestedRef.current = false;
+                  setRetryNonce((value) => value + 1);
+                }}
+              >
+                Retry
+              </Button>
+            }
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="page-shell">
         <Alert

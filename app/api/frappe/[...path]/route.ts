@@ -19,8 +19,8 @@ const forwardRequest = async (request: NextRequest, path: string[]) => {
   const cookie = request.headers.get("cookie");
   const authorization = request.headers.get("authorization");
 
-  // Prefer standard ERPNext session authentication via forwarded cookies.
-  if (cookie && !authorization) {
+  // Always forward incoming session cookies for native ERPNext auth.
+  if (cookie) {
     headers.cookie = cookie;
   }
 

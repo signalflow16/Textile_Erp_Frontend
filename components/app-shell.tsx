@@ -47,6 +47,38 @@ export function AppShell({
   const [isMobile, setIsMobile] = useState(false);
 
   const selectedKey = (() => {
+    if (pathname === "/buying") {
+      return "buying-dashboard";
+    }
+
+    if (pathname.startsWith("/buying/material-requests")) {
+      return "buying-material-requests";
+    }
+
+    if (pathname.startsWith("/buying/rfqs")) {
+      return "buying-rfqs";
+    }
+
+    if (pathname.startsWith("/buying/supplier-quotations")) {
+      return "buying-supplier-quotations";
+    }
+
+    if (pathname.startsWith("/buying/purchase-orders")) {
+      return "buying-purchase-orders";
+    }
+
+    if (pathname.startsWith("/buying/purchase-receipts")) {
+      return "buying-purchase-receipts";
+    }
+
+    if (pathname.startsWith("/buying/purchase-invoices")) {
+      return "buying-purchase-invoices";
+    }
+
+    if (pathname.startsWith("/pos")) {
+      return "sales-pos";
+    }
+
     if (pathname === "/initial-setup") {
       return "admin-initial-setup-dashboard";
     }
@@ -133,7 +165,7 @@ export function AppShell({
           theme="light"
           mode="inline"
           selectedKeys={[selectedKey]}
-          defaultOpenKeys={["item-master-menu", "initial-setup-menu"]}
+          defaultOpenKeys={["item-master-menu", "buying-menu", "sales-menu", "initial-setup-menu"]}
           items={[
             {
               key: "stock-header",
@@ -153,6 +185,48 @@ export function AppShell({
                       key: "stock-items-new",
                       icon: <FileAddOutlined />,
                       label: <Link href="/stock/items/new">Create Item</Link>
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              key: "buying-header",
+              type: "group",
+              label: "Buying",
+              children: [
+                {
+                  key: "buying-menu",
+                  icon: <ShoppingCartOutlined />,
+                  label: "Procurement",
+                  children: [
+                    {
+                      key: "buying-dashboard",
+                      label: <Link href="/buying">Dashboard</Link>
+                    },
+                    {
+                      key: "buying-material-requests",
+                      label: <Link href="/buying/material-requests">Material Requests</Link>
+                    },
+                    {
+                      key: "buying-rfqs",
+                      label: <Link href="/buying/rfqs">RFQs</Link>
+                    },
+                    {
+                      key: "buying-supplier-quotations",
+                      label: <Link href="/buying/supplier-quotations">Supplier Quotations</Link>
+                    },
+                    {
+                      key: "buying-purchase-orders",
+                      label: <Link href="/buying/purchase-orders">Purchase Orders</Link>
+                    },
+                    {
+                      key: "buying-purchase-receipts",
+                      label: <Link href="/buying/purchase-receipts">Purchase Receipts</Link>
+                    },
+                    {
+                      key: "buying-purchase-invoices",
+                      label: <Link href="/buying/purchase-invoices">Purchase Invoices</Link>
                     }
                   ]
                 }
@@ -223,7 +297,13 @@ export function AppShell({
                 {
                   key: "sales",
                   icon: <AppstoreOutlined />,
-                  label: "Sales"
+                  label: "Sales",
+                  children: [
+                    {
+                      key: "sales-pos",
+                      label: <Link href="/pos">POS Billing</Link>
+                    }
+                  ]
                 }
               ]
             }
