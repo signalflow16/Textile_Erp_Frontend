@@ -42,13 +42,15 @@ const toTreeData = ({
         </div>
 
         {selectedWarehouse === node.name ? (
-          <WarehouseActions
-            canAddChild={!node.parent_warehouse}
-            canDelete={Boolean(node.parent_warehouse)}
-            onEdit={() => onEdit(node.name)}
-            onAddChild={() => onAddChild(node.name)}
-            onDelete={() => onDelete(node.name)}
-          />
+          <div className="item-group-tree-row-actions">
+            <WarehouseActions
+              canAddChild={!node.parent_warehouse}
+              canDelete={Boolean(node.parent_warehouse)}
+              onEdit={() => onEdit(node.name)}
+              onAddChild={() => onAddChild(node.name)}
+              onDelete={() => onDelete(node.name)}
+            />
+          </div>
         ) : null}
       </div>
     ),

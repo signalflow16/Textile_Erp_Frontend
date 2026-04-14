@@ -37,18 +37,7 @@ export type LoginRequest = {
   password: string;
 };
 
-export type RefreshTokenRequest = {
-  refresh_token: string;
-};
-
-export type LogoutRequest = {
-  access_token: string;
-  refresh_token: string;
-};
-
 export type LoginResponse = {
-  access_token?: string;
-  refresh_token?: string;
   message?: string;
   full_name?: string;
   home_page?: string;

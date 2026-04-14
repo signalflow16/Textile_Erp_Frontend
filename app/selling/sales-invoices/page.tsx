@@ -1,13 +1,13 @@
 import { AppShell } from "@/components/app-shell";
 import { DocumentListPage } from "@/components/documents/document-list-page";
 
-export default function SellingPage() {
+export default function SalesInvoiceListRoute() {
   return (
     <AppShell
       section="Selling"
       title="Sales Invoices"
       breadcrumb="Selling > Sales Invoices"
-      subtitle="Create customer invoices with pricing defaults, stock validation, and document lifecycle controls."
+      subtitle="Manage customer billing documents with realtime stock validation."
     >
       <DocumentListPage doctype="Sales Invoice" />
     </AppShell>

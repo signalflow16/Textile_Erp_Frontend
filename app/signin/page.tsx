@@ -5,10 +5,16 @@ import { useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Alert, Button, Card, Form, Input, Space, Typography } from "antd";
 
+import {
+  AUTH_RETRY_DELAY_MS,
+  isRetryableAuthError,
+  isUnauthorizedAuthError,
+  waitFor
+} from "@/lib/auth-session";
 import { extractApiErrorMessage, extractEnvelopeMessage } from "@/lib/api-errors";
 import { useAppDispatch } from "@/store/hooks";
 import { useLazyAuthMeQuery, useLoginMutation } from "@/store/api/frappeApi";
-import { clearAuth, setAuthMe } from "@/store/features/auth/authSlice";
+import { clearAuth, markAuthenticated, setAuthHydrated, setAuthMe } from "@/store/features/auth/authSlice";
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -38,6 +44,41 @@ export default function SignInPage() {
       response,
       toMessage(response.message, toMessage(response.error?.message, fallback))
     );
+  const syncSignedInUser = async () => {
+    try {
+      const response = await triggerAuthMe().unwrap();
+      const userId = typeof response.data?.user_id === "string" ? response.data.user_id : null;
+
+      if (response.ok && userId && userId !== "Guest") {
+        dispatch(setAuthMe(response.data));
+      }
+    } catch (error) {
+      if (isUnauthorizedAuthError(error)) {
+        dispatch(clearAuth());
+        return;
+      }
+
+      if (!isRetryableAuthError(error)) {
+        return;
+      }
+
+      await waitFor(AUTH_RETRY_DELAY_MS);
+
+      try {
+        const retryResponse = await triggerAuthMe().unwrap();
+        const userId =
+          typeof retryResponse.data?.user_id === "string" ? retryResponse.data.user_id : null;
+
+        if (retryResponse.ok && userId && userId !== "Guest") {
+          dispatch(setAuthMe(retryResponse.data));
+        }
+      } catch (retryError) {
+        if (isUnauthorizedAuthError(retryError)) {
+          dispatch(clearAuth());
+        }
+      }
+    }
+  };
 
   const handleSubmit = async (values: SignInValues) => {
     setErrorMessage(null);
@@ -49,14 +90,9 @@ export default function SignInPage() {
         return;
       }
 
-      const meResponse = await triggerAuthMe().unwrap();
-      if (!meResponse.ok) {
-        dispatch(clearAuth());
-        setErrorMessage(getFailureMessage(meResponse, "Unable to validate signed-in account."));
-        return;
-      }
-
-      dispatch(setAuthMe(meResponse.data));
+      dispatch(markAuthenticated({ full_name: response.data.full_name }));
+      dispatch(setAuthHydrated(true));
+      void syncSignedInUser();
       router.replace(redirectTo);
     } catch (error) {
       setErrorMessage(extractApiErrorMessage(error, "Unable to sign in right now."));

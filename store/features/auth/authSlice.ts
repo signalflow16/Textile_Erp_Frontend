@@ -4,48 +4,44 @@ import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
 
 import type { AuthMeResponse } from "@/types/auth";
 
+export type AuthStatus = "loading" | "authenticated" | "unauthenticated";
+
 type AuthState = {
-  accessToken: string | null;
-  refreshToken: string | null;
   me: AuthMeResponse | null;
   hydrated: boolean;
+  status: AuthStatus;
 };
 
 const initialState: AuthState = {
-  accessToken: null,
-  refreshToken: null,
   me: null,
-  hydrated: false
+  hydrated: false,
+  status: "loading"
 };
 
 const authSlice = createSlice({
   name: "auth",
   initialState,
   reducers: {
-    hydrateAuthTokens(
-      state,
-      action: PayloadAction<{ accessToken: string | null; refreshToken: string | null }>
-    ) {
-      state.accessToken = action.payload.accessToken;
-      state.refreshToken = action.payload.refreshToken;
+    setAuthStatus(state, action: PayloadAction<AuthStatus>) {
+      state.status = action.payload;
     },
-    setTokens(
-      state,
-      action: PayloadAction<{ accessToken: string | null; refreshToken: string | null }>
-    ) {
-      state.accessToken = action.payload.accessToken;
-      state.refreshToken = action.payload.refreshToken;
-    },
-    setAccessToken(state, action: PayloadAction<string | null>) {
-      state.accessToken = action.payload;
+    markAuthenticated(state, action: PayloadAction<Partial<AuthMeResponse> | null | undefined>) {
+      state.status = "authenticated";
+
+      if (action.payload) {
+        state.me = {
+          ...(state.me ?? {}),
+          ...action.payload
+        };
+      }
     },
     setAuthMe(state, action: PayloadAction<AuthMeResponse | null>) {
       state.me = action.payload;
+      state.status = action.payload ? "authenticated" : "unauthenticated";
     },
     clearAuth(state) {
-      state.accessToken = null;
-      state.refreshToken = null;
       state.me = null;
+      state.status = "unauthenticated";
     },
     setAuthHydrated(state, action: PayloadAction<boolean>) {
       state.hydrated = action.payload;
@@ -55,11 +51,10 @@ const authSlice = createSlice({
 
 export const {
   clearAuth,
-  hydrateAuthTokens,
-  setAccessToken,
   setAuthHydrated,
   setAuthMe,
-  setTokens
+  setAuthStatus,
+  markAuthenticated
 } = authSlice.actions;
 
 export default authSlice.reducer;

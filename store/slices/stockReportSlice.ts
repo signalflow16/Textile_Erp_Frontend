@@ -12,6 +12,7 @@ import {
   resolveMinimumQuantity
 } from "@/services/stockLogic";
 import { invalidateStockSnapshots } from "@/store/actions/stockSync";
+import { stockEvents } from "@/store/actions/stockEvents";
 import type { RootState } from "@/store";
 import type {
   FrappeBinPayload,
@@ -488,6 +489,18 @@ const stockReportSlice = createSlice({
         state.error.itemShortage = action.payload ?? "Unable to fetch item shortage.";
       })
       .addCase(invalidateStockSnapshots, (state) => {
+        state.loading.stockBalance = false;
+        state.loading.stockLedger = false;
+        state.loading.warehouseStock = false;
+        state.loading.itemShortage = false;
+      })
+      .addCase(stockEvents.documentSubmitted, (state) => {
+        state.loading.stockBalance = false;
+        state.loading.stockLedger = false;
+        state.loading.warehouseStock = false;
+        state.loading.itemShortage = false;
+      })
+      .addCase(stockEvents.documentCancelled, (state) => {
         state.loading.stockBalance = false;
         state.loading.stockLedger = false;
         state.loading.warehouseStock = false;

@@ -58,21 +58,23 @@ const toTreeData = ({
         </div>
 
         {selectedGroup === node.name ? (
-          <GroupActions
-            itemGroupName={node.item_group_name}
-            canDelete={node.can_delete}
-            canAddChild={Boolean(node.is_group)}
-            isRenaming={renamingGroup === node.name}
-            renameValue={renameValue}
-            renameLoading={renameLoading}
-            onRenameValueChange={onRenameChange}
-            onRenameStart={() => onRenameStart(node)}
-            onRenameCancel={onRenameCancel}
-            onRenameSubmit={onRenameSubmit}
-            onEdit={() => onEdit(node.name)}
-            onAddChild={() => onAddChild(node.name)}
-            onDelete={() => onDelete(node.name)}
-          />
+          <div className="item-group-tree-row-actions">
+            <GroupActions
+              itemGroupName={node.item_group_name}
+              canDelete={node.can_delete}
+              canAddChild={Boolean(node.is_group)}
+              isRenaming={renamingGroup === node.name}
+              renameValue={renameValue}
+              renameLoading={renameLoading}
+              onRenameValueChange={onRenameChange}
+              onRenameStart={() => onRenameStart(node)}
+              onRenameCancel={onRenameCancel}
+              onRenameSubmit={onRenameSubmit}
+              onEdit={() => onEdit(node.name)}
+              onAddChild={() => onAddChild(node.name)}
+              onDelete={() => onDelete(node.name)}
+            />
+          </div>
         ) : null}
       </div>
     ),

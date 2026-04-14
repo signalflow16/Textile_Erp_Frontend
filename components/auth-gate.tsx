@@ -1,18 +1,23 @@
 "use client";
 
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Alert, Spin } from "antd";
 
-import { clearAuthTokens } from "@/lib/auth-storage";
 import {
-  useLazyAuthMeQuery
-} from "@/store/api/frappeApi";
+  AUTH_LOADING_GRACE_MS,
+  AUTH_RETRY_DELAY_MS,
+  isRetryableAuthError,
+  isUnauthorizedAuthError,
+  waitFor
+} from "@/lib/auth-session";
+import { useLazyAuthMeQuery } from "@/store/api/frappeApi";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
   clearAuth,
   setAuthHydrated,
-  setAuthMe
+  setAuthMe,
+  setAuthStatus
 } from "@/store/features/auth/authSlice";
 
 const PUBLIC_ROUTES = ["/signin", "/signup"];
@@ -21,83 +26,112 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const dispatch = useAppDispatch();
-  const { me, hydrated } = useAppSelector((state) => state.auth);
-  const [triggerAuthMe, authMeState] = useLazyAuthMeQuery();
-  const authRequestedRef = useRef(false);
+  const { hydrated, me, status } = useAppSelector((state) => state.auth);
+  const [triggerAuthMe] = useLazyAuthMeQuery();
+  const bootstrapStartedRef = useRef(false);
+  const [graceElapsed, setGraceElapsed] = useState(false);
   const isPublicRoute = useMemo(
     () => (pathname ? PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) : false),
     [pathname]
   );
 
   useEffect(() => {
-    if (hydrated) {
+    if (bootstrapStartedRef.current) {
       return;
     }
 
-    dispatch(setAuthHydrated(true));
-  }, [dispatch, hydrated]);
+    bootstrapStartedRef.current = true;
+    dispatch(setAuthStatus("loading"));
 
-  useEffect(() => {
-    if (!hydrated || me || authMeState.isFetching || authRequestedRef.current) {
-      return;
-    }
+    let active = true;
+    const graceTimer = window.setTimeout(() => {
+      if (active) {
+        setGraceElapsed(true);
+      }
+    }, AUTH_LOADING_GRACE_MS);
 
-    authRequestedRef.current = true;
-    void triggerAuthMe();
-  }, [authMeState.isFetching, hydrated, me, triggerAuthMe]);
+    const finishBootstrap = () => {
+      if (!active) {
+        return;
+      }
 
-  useEffect(() => {
-    if (!authMeState.data) {
-      return;
-    }
+      dispatch(setAuthHydrated(true));
+    };
 
-    if (authMeState.data.ok) {
-      dispatch(setAuthMe(authMeState.data.data));
-      return;
-    }
+    const loadSession = async () => {
+      try {
+        const response = await triggerAuthMe().unwrap();
+        const userId = typeof response.data?.user_id === "string" ? response.data.user_id : null;
 
-    dispatch(clearAuth());
-    clearAuthTokens();
-  }, [authMeState.data, dispatch]);
+        if (!response.ok || !userId || userId === "Guest") {
+          dispatch(clearAuth());
+          return;
+        }
 
-  useEffect(() => {
-    if (!authMeState.error) {
-      return;
-    }
+        dispatch(setAuthMe(response.data));
+        return;
+      } catch (error) {
+        if (isUnauthorizedAuthError(error)) {
+          dispatch(clearAuth());
+          return;
+        }
 
-    if (isPublicRoute) {
-      return;
-    }
+        if (isRetryableAuthError(error)) {
+          await waitFor(AUTH_RETRY_DELAY_MS);
 
-    dispatch(clearAuth());
-    clearAuthTokens();
-  }, [authMeState.error, dispatch, isPublicRoute]);
+          try {
+            const retryResponse = await triggerAuthMe().unwrap();
+            const userId =
+              typeof retryResponse.data?.user_id === "string" ? retryResponse.data.user_id : null;
+
+            if (!retryResponse.ok || !userId || userId === "Guest") {
+              dispatch(clearAuth());
+              return;
+            }
+
+            dispatch(setAuthMe(retryResponse.data));
+            return;
+          } catch (retryError) {
+            if (isUnauthorizedAuthError(retryError) || isRetryableAuthError(retryError)) {
+              dispatch(clearAuth());
+              return;
+            }
+          }
+        }
+
+        dispatch(clearAuth());
+      } finally {
+        finishBootstrap();
+      }
+    };
+
+    void loadSession();
+
+    return () => {
+      active = false;
+      window.clearTimeout(graceTimer);
+    };
+  }, [dispatch, triggerAuthMe]);
 
   useEffect(() => {
     if (!hydrated) {
       return;
     }
 
-    if (isPublicRoute && me) {
+    if (isPublicRoute && status === "authenticated") {
       router.replace("/stock");
       return;
     }
 
-    const isVerifying = authMeState.isFetching;
-    if (!isPublicRoute && !me && !isVerifying) {
+    if (!isPublicRoute && status === "unauthenticated") {
       const redirectTo = pathname || "/stock";
       router.replace(`/signin?redirect=${encodeURIComponent(redirectTo)}`);
     }
-  }, [
-    authMeState.isFetching,
-    hydrated,
-    isPublicRoute,
-    me,
-    pathname,
-    router
-  ]);
+  }, [hydrated, isPublicRoute, pathname, router, status]);
 
-  if (!hydrated) {
+  const shouldShowLoading = !hydrated || (status === "loading" && !graceElapsed);
+
+  if (shouldShowLoading) {
     return (
       <div className="centered-state">
         <Spin size="large" />
@@ -105,8 +139,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     );
   }
 
-  const isVerifying = !isPublicRoute && !me && authMeState.isFetching;
-  if (isVerifying) {
+  if (status === "loading") {
     return (
       <div className="centered-state">
         <Spin size="large" />
@@ -118,7 +151,7 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
 
-  if (!me) {
+  if (status !== "authenticated" && !me) {
     return (
       <div className="page-shell">
         <Alert

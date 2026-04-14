@@ -39,6 +39,15 @@ export const masterDataEndpoints = {
   uom: {
     list: resourcePath("UOM")
   },
+  priceList: {
+    list: resourcePath("Price List")
+  },
+  uomConversionFactor: {
+    list: resourcePath("UOM Conversion Factor")
+  },
+  itemPrice: {
+    list: resourcePath("Item Price")
+  },
   company: {
     list: resourcePath("Company")
   },
@@ -48,6 +57,7 @@ export const masterDataEndpoints = {
     stockLedgerEntry: resourcePath("Stock Ledger Entry"),
     stockEntryType: resourcePath("Stock Entry Type"),
     purchaseReceipt: resourcePath("Purchase Receipt"),
-    deliveryNote: resourcePath("Delivery Note")
+    deliveryNote: resourcePath("Delivery Note"),
+    salesInvoice: resourcePath("Sales Invoice")
   }
 };

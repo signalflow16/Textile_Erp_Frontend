@@ -2,8 +2,14 @@
 
 import axios, { AxiosError, type AxiosRequestConfig } from "axios";
 
-import { loadAuthTokens } from "@/lib/auth-storage";
 import { extractApiErrorMessage } from "@/lib/api-errors";
+import {
+  handleUnauthorizedSession,
+  isAuthExcludedPath,
+  recoverCookieSession,
+  shouldRetryTransientError,
+  type RetryableRequestConfig
+} from "@/lib/auth-runtime";
 
 const API_BASE_URL = "/api/frappe";
 
@@ -33,9 +39,16 @@ export type NormalizedApiError = {
 
 export const normalizeApiError = (error: unknown, fallback: string): NormalizedApiError => {
   if (axios.isAxiosError(error)) {
+    const status = error.response?.status;
     return {
-      status: error.response?.status,
-      message: extractApiErrorMessage({ data: error.response?.data }, fallback),
+      status,
+      message:
+        status === 403
+          ? extractApiErrorMessage(
+              { data: error.response?.data },
+              "You do not have permission to perform this action."
+            )
+          : extractApiErrorMessage({ data: error.response?.data }, fallback),
       data: error.response?.data ?? error.message
     };
   }
@@ -58,14 +71,9 @@ export const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use((config) => {
   const headers = config.headers ?? {};
   const csrfToken = readCookieValue("csrf_token");
-  const { accessToken } = loadAuthTokens();
 
   if (csrfToken) {
     headers["x-frappe-csrf-token"] = csrfToken;
-  }
-
-  if (accessToken && !headers.Authorization) {
-    headers.Authorization = `token ${accessToken}`;
   }
 
   config.headers = headers;
@@ -74,7 +82,36 @@ axiosInstance.interceptors.request.use((config) => {
 
 axiosInstance.interceptors.response.use(
   (response) => response,
-  (error: AxiosError) => Promise.reject(error)
+  async (error: AxiosError) => {
+    const requestConfig = (error.config ?? {}) as RetryableRequestConfig;
+    const status = error.response?.status;
+
+    if (status === 401) {
+      if (isAuthExcludedPath(requestConfig.url)) {
+        handleUnauthorizedSession();
+        return Promise.reject(error);
+      }
+
+      if (!requestConfig._retry) {
+        requestConfig._retry = true;
+
+        const sessionRecovered = await recoverCookieSession();
+        if (sessionRecovered) {
+          return axiosInstance.request(requestConfig);
+        }
+      }
+
+      handleUnauthorizedSession();
+      return Promise.reject(error);
+    }
+
+    if (shouldRetryTransientError(error, requestConfig)) {
+      requestConfig._transientRetry = true;
+      return axiosInstance.request(requestConfig);
+    }
+
+    return Promise.reject(error);
+  }
 );
 
 export const apiRequest = async <T>(config: AxiosRequestConfig) => {

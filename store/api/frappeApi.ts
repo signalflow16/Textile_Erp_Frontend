@@ -12,7 +12,6 @@ import type {
   LoginRequest,
   LoginResponse,
   RoleMasterItem,
-  LogoutRequest,
   SignupOwnerRequest,
   UserAccount
 } from "@/types/auth";
@@ -656,7 +655,7 @@ export const frappeApi = createApi({
           response.message || "Logged in"
         )
     }),
-    logoutUser: builder.mutation<ApiEnvelope<unknown>, LogoutRequest | void>({
+    logoutUser: builder.mutation<ApiEnvelope<unknown>, void>({
       query: () => ({
         url: "/method/logout",
         method: "POST"
@@ -677,7 +676,7 @@ export const frappeApi = createApi({
         }
 
         const userId = (loggedUserResult.data as FrappeLoggedUserResponse).message;
-        if (!userId || typeof userId !== "string") {
+        if (!userId || typeof userId !== "string" || userId === "Guest") {
           return { data: toFailure<AuthMeResponse>("Unable to resolve signed-in user.", "INVALID_SESSION") };
         }
 
@@ -712,6 +711,7 @@ export const frappeApi = createApi({
 
         return { data: toSuccess(mapped, "User loaded") };
       },
+      keepUnusedDataFor: 300,
       providesTags: ["Session"]
     }),
     createUserAccount: builder.mutation<ApiEnvelope<UserAccount>, CreateUserAccountRequest>({

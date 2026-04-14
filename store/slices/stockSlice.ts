@@ -12,6 +12,7 @@ import {
   resolveMinimumQuantity
 } from "@/services/stockLogic";
 import { invalidateStockSnapshots } from "@/store/actions/stockSync";
+import { stockEvents } from "@/store/actions/stockEvents";
 import type { RootState } from "@/store";
 import type { FrappeListPayload, MasterDataRequestState } from "@/types/master-data";
 import type { LookupOption } from "@/types/item";
@@ -665,6 +666,14 @@ const stockSlice = createSlice({
         state.createError = action.payload ?? "Unable to create stock entry.";
       })
       .addCase(invalidateStockSnapshots, (state) => {
+        state.stockDataVersion += 1;
+        state.dashboardStatus = "idle";
+      })
+      .addCase(stockEvents.documentSubmitted, (state) => {
+        state.stockDataVersion += 1;
+        state.dashboardStatus = "idle";
+      })
+      .addCase(stockEvents.documentCancelled, (state) => {
         state.stockDataVersion += 1;
         state.dashboardStatus = "idle";
       });

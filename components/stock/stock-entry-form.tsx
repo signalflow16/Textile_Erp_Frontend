@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Alert, App, Button, Card, DatePicker, Form, Select, Space, TimePicker, Typography } from "antd";
 import { useRouter } from "next/navigation";
 import dayjs, { type Dayjs } from "dayjs";
 
 import { StockEntryItemsTable } from "@/components/stock/stock-entry-items-table";
+import { validateStockAvailability } from "@/services/documentEngine";
 import { fetchStockEntryLookups, createStockEntry, selectStockEntryLookups, selectStockState } from "@/store/slices/stockSlice";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import type { StockEntryCreateValues } from "@/types/stock";
+import type { RowStockValidation } from "@/types/document-engine";
 
 const { Text } = Typography;
 
@@ -36,8 +38,10 @@ export function StockEntryForm() {
   const router = useRouter();
   const { notification } = App.useApp();
   const [form] = Form.useForm<StockEntryFormValues>();
+  const items = Form.useWatch("items", form);
   const lookups = useAppSelector(selectStockEntryLookups);
   const stockState = useAppSelector(selectStockState);
+  const [validations, setValidations] = useState<RowStockValidation[]>([]);
 
   useEffect(() => {
     if (stockState.lookupsStatus === "idle") {
@@ -56,13 +60,66 @@ export function StockEntryForm() {
     }
   }, [form, lookups.stockEntryTypes]);
 
+  useEffect(() => {
+    const currentItems = Array.isArray(items) ? items : [];
+    if (currentItems.length === 0) {
+      setValidations([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    void Promise.all(
+      currentItems.map(async (item, index) => {
+        if (!item?.source_warehouse || !item?.item_code) {
+          return {
+            rowId: String(index),
+            warehouse: item?.source_warehouse,
+            availableQty: 0,
+            requiredQty: Number(item?.qty ?? 0),
+            shortageQty: 0,
+            ok: true
+          } satisfies RowStockValidation;
+        }
+
+        const validation = await validateStockAvailability({
+          itemCode: item.item_code,
+          warehouse: item.source_warehouse,
+          requiredQty: Number(item.qty ?? 0)
+        });
+
+        return {
+          ...validation,
+          rowId: String(index)
+        };
+      })
+    ).then((rows) => {
+      if (!cancelled) {
+        setValidations(rows);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [items]);
+
   const handleFinish = async (values: StockEntryFormValues) => {
     const invalidRow = values.items.find((item) => !item.source_warehouse && !item.target_warehouse);
+    const stockIssue = validations.find((entry) => !entry.ok);
 
     if (invalidRow) {
       notification.error({
         message: "Warehouse is required",
         description: "Each stock entry row must include at least a source warehouse or a target warehouse."
+      });
+      return;
+    }
+
+    if (stockIssue) {
+      notification.error({
+        message: "Insufficient stock",
+        description: stockIssue.message || "Source warehouse does not have enough stock for one or more rows."
       });
       return;
     }
@@ -166,7 +223,7 @@ export function StockEntryForm() {
             </Form.Item>
           </div>
 
-          <StockEntryItemsTable lookups={lookups} />
+          <StockEntryItemsTable lookups={lookups} validations={validations} />
         </Form>
       </Card>
     </div>

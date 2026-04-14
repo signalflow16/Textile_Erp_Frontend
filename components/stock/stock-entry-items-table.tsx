@@ -4,6 +4,7 @@ import { Button, Checkbox, Form, InputNumber, Select, Space, Table } from "antd"
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 
 import type { StockEntryCreateValues, StockEntryLookups } from "@/types/stock";
+import type { RowStockValidation } from "@/types/document-engine";
 
 type StockEntryFormValues = {
   stock_entry_type: string;
@@ -13,10 +14,15 @@ type StockEntryFormValues = {
 };
 
 export function StockEntryItemsTable({
-  lookups
+  lookups,
+  validations
 }: {
   lookups: StockEntryLookups;
+  validations: RowStockValidation[];
 }) {
+  const form = Form.useFormInstance<StockEntryFormValues>();
+  const validationMap = new Map(validations.map((entry) => [entry.rowId, entry]));
+
   return (
     <Form.List name="items">
       {(fields, { add, remove }) => {
@@ -110,6 +116,24 @@ export function StockEntryItemsTable({
                       <InputNumber min={0} precision={2} style={{ width: "100%" }} placeholder="Optional" />
                     </Form.Item>
                   )
+                },
+                {
+                  title: "Available",
+                  width: 170,
+                  render: (_value, record) => {
+                    const itemCode = form.getFieldValue(["items", record.name, "item_code"]);
+                    const validation = validationMap.get(String(record.name)) ?? validationMap.get(itemCode);
+                    return (
+                      <div>
+                        <div>{validation ? validation.availableQty.toFixed(2) : "-"}</div>
+                        {validation && !validation.ok ? (
+                          <div style={{ color: "#dc2626", fontSize: 12 }}>
+                            Short {validation.shortageQty.toFixed(2)}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  }
                 },
                 {
                   title: "Allow Zero Valuation",
