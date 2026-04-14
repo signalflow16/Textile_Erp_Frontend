@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { Alert, Spin } from "antd";
+import { useEffect, useMemo, useRef, useState, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { Alert, Button, Spin } from "antd";
 
 import {
   AUTH_LOADING_GRACE_MS,
@@ -24,6 +24,7 @@ const PUBLIC_ROUTES = ["/signin", "/signup"];
 
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { hydrated, me, status } = useAppSelector((state) => state.auth);
@@ -34,6 +35,22 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     () => (pathname ? PUBLIC_ROUTES.some((route) => pathname.startsWith(route)) : false),
     [pathname]
   );
+  const authErrorStatus = (() => {
+    if (!authMeState.error || typeof authMeState.error !== "object") {
+      return null;
+    }
+
+    const statusValue = (authMeState.error as { status?: unknown }).status;
+    return typeof statusValue === "number" ? statusValue : null;
+  })();
+  const isSessionInvalid =
+    authErrorStatus === 401 ||
+    authErrorStatus === 403 ||
+    (Boolean(authMeState.data) && authMeState.data?.ok === false);
+  const hasAuthCheckCompleted = Boolean(me) || (authRequestedRef.current && !authMeState.isFetching);
+  const isVerifying = !isPublicRoute && !me && !hasAuthCheckCompleted;
+  const isSessionExpired = !isPublicRoute && !me && hasAuthCheckCompleted && isSessionInvalid;
+  const hasAuthCheckError = !isPublicRoute && !me && hasAuthCheckCompleted && Boolean(authMeState.error) && !isSessionInvalid;
 
   useEffect(() => {
     if (bootstrapStartedRef.current) {

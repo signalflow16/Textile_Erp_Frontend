@@ -21,7 +21,7 @@ export function DashboardCard({
   accentClassName?: string;
 }) {
   return (
-    <Card className={`stock-dashboard-card ${accentClassName ?? ""}`.trim()} bordered={false}>
+    <Card className={`stock-dashboard-card ${accentClassName ?? ""}`.trim()} variant="borderless">
       <div className="stock-dashboard-card-shell">
         <div className="stock-dashboard-card-icon">{icon}</div>
         <Space direction="vertical" size={4} className="stock-dashboard-card-content">

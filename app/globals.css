@@ -950,6 +950,102 @@ a {
   font-size: 12px;
 }
 
+.buying-list-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.buying-form-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.buying-item-row {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.buying-suppliers-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.buying-supplier-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+}
+
+.pos-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.pos-customer-grid {
+  display: grid;
+  grid-template-columns: 1.1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.pos-item-search-grid {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 10px;
+  align-items: center;
+}
+
+.pos-summary-grid {
+  display: grid;
+  grid-template-columns: 340px 1fr;
+  gap: 12px;
+}
+
+.pos-payment-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.pos-preview-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  gap: 12px;
+  align-items: start;
+}
+
+.pos-square-fields .ant-input,
+.pos-square-fields .ant-input-affix-wrapper,
+.pos-square-fields .ant-input-number,
+.pos-square-fields .ant-input-number .ant-input-number-input,
+.pos-square-fields .ant-select .ant-select-selector {
+  border-radius: 0 !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.pos-square-fields .ant-input,
+.pos-square-fields .ant-input-affix-wrapper,
+.pos-square-fields .ant-input-number,
+.pos-square-fields .ant-select {
+  width: 100%;
+}
+
+.pos-square-fields .ant-table,
+.pos-square-fields .ant-table-container,
+.pos-square-fields .ant-table-thead > tr > th,
+.pos-square-fields .ant-table-tbody > tr > td {
+  border: none !important;
+}
+
 @keyframes subtle-enter {
   from {
     opacity: 0;
@@ -1983,6 +2079,14 @@ a {
   }
 
   .setup-form-grid-supplier {
+    grid-template-columns: 1fr;
+  }
+
+  .buying-list-filter-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .buying-form-grid-3 {
     grid-template-columns: 1fr;
   }
 

@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { DocumentListPage } from "@/components/documents/document-list-page";
 
-export default function BuyingPage() {
+export default function BuyingDashboardPage() {
   return (
     <AppShell
       section="Buying"
