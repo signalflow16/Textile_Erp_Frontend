@@ -25,7 +25,7 @@ export default function SignInPage() {
   const [triggerAuthMe] = useLazyAuthMeQuery();
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const redirectTo = useMemo(
-    () => searchParams.get("redirect") || "/stock/items",
+    () => searchParams.get("redirect") || "/stock",
     [searchParams]
   );
   const toMessage = (value: unknown, fallback: string) =>

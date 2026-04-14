@@ -1,18 +1,14 @@
 import { AppShell } from "@/components/app-shell";
-import { ItemMasterToolbar } from "@/components/stock/item-master-toolbar";
-import { ItemTable } from "@/components/stock/item-table";
+import { StockItemsPage } from "@/components/stock/stock-items-page";
 
 export default function ItemsPage() {
   return (
     <AppShell
-      title="Item Master"
-      breadcrumb="Stock > Item"
-      subtitle="Manage stock items, templates, and variants from a single operational screen."
-      actions={<ItemMasterToolbar />}
+      title="Items"
+      breadcrumb="Stock > Items"
+      subtitle="Search, filter, and create stock items through the master-data workspace."
     >
-      <div className="page-stack">
-        <ItemTable />
-      </div>
+      <StockItemsPage />
     </AppShell>
   );
 }

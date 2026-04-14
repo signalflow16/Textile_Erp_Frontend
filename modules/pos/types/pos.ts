@@ -21,6 +21,64 @@ export type PosCustomerLookup = PosLookupOption & {
 
 export type PosPaymentMode = PosLookupOption;
 export type PosHsCodeLookup = PosLookupOption;
+export type PosProfileLookup = PosLookupOption & {
+  company?: string;
+  warehouse?: string;
+  customer?: string;
+  currency?: string;
+};
+
+export type PosOpeningAmountRow = {
+  mode_of_payment: string;
+  opening_amount: number;
+};
+
+export type PosSession = {
+  name: string;
+  pos_profile: string;
+  company?: string;
+  user?: string;
+  status?: string;
+  opening_time?: string;
+  posting_date?: string;
+  remarks?: string;
+  warehouse?: string;
+  default_customer?: string;
+  opening_amounts: PosOpeningAmountRow[];
+};
+
+export type PosOpeningEntryPayload = {
+  pos_profile: string;
+  company?: string;
+  opening_cash: number;
+  remarks?: string;
+};
+
+export type PosClosingAmountRow = {
+  mode_of_payment: string;
+  expected_amount: number;
+  actual_amount: number;
+  difference: number;
+};
+
+export type PosSessionSummary = {
+  opening_entry: string;
+  pos_profile: string;
+  company?: string;
+  opening_time?: string;
+  opening_amount_total: number;
+  opening_amount_by_mode: PosOpeningAmountRow[];
+  invoice_count: number;
+  total_sales: number;
+  totals_by_mode: Array<{ mode_of_payment: string; amount: number }>;
+  expected_closing_cash: number;
+};
+
+export type PosClosingEntryPayload = {
+  pos_opening_entry: string;
+  actual_amounts: Array<{ mode_of_payment: string; amount: number }>;
+  remarks?: string;
+};
 
 export type PosCartItem = {
   rowId: string;
@@ -55,6 +113,8 @@ export type PosInvoiceDoc = {
   due_date?: string;
   is_pos: 1;
   update_stock?: 1;
+  pos_profile?: string;
+  pos_opening_entry?: string;
   set_warehouse?: string;
   remarks?: string;
   mode_of_payment?: string;
@@ -79,6 +139,8 @@ export type PosInvoiceDoc = {
 
 export type PosFormState = {
   customer: string;
+  pos_profile?: string;
+  pos_opening_entry?: string;
   set_warehouse?: string;
   mode_of_payment?: string;
   paid_amount?: number;

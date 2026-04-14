@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import {
   useCreatePosInvoiceMutation,
   useLazyGetItemStockQtyQuery,
   useLazyGetPosItemMetaQuery,
+  useLazyGetPosItemSellingRateQuery,
   useLazySearchPosItemsQuery,
   useListPosPaymentModesQuery,
   useSubmitPosInvoiceMutation,
@@ -11,22 +12,25 @@ import {
 } from "@/modules/pos/api/posApi";
 import { useListWarehousesQuery } from "@/modules/buying/api/buyingApi";
 import { defaultWalkInCustomer } from "@/modules/pos/hooks/usePosCustomerSearch";
-import type { PosCartItem, PosFormState, PosItemLookup, PosInvoiceDoc } from "@/modules/pos/types/pos";
+import type { PosCartItem, PosFormState, PosItemLookup, PosInvoiceDoc, PosSession } from "@/modules/pos/types/pos";
 import { calcPosTotals } from "@/modules/pos/utils/posCalculations";
 import { toPosInvoicePayload } from "@/modules/pos/utils/posPayloadMapper";
 import { openErpNextPrintPreview } from "@/modules/pos/utils/printBill";
 import { createEmptyPosRow, normalizePosRows, toBillableRows } from "@/modules/pos/utils/rowCompletion";
 import { validatePosBeforeSave, validatePosBeforeSubmit } from "@/modules/pos/utils/posValidation";
+import { createOrUpdatePosBillDraft, submitPosBill } from "@/modules/pos/utils/posSessionService";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-const createDefaultForm = (): PosFormState => ({
-  customer: defaultWalkInCustomer,
+const createDefaultForm = (session?: PosSession | null): PosFormState => ({
+  customer: session?.default_customer ?? defaultWalkInCustomer,
+  pos_profile: session?.pos_profile,
+  pos_opening_entry: session?.name,
   posting_date: today(),
   paid_amount: undefined,
   mode_of_payment: undefined,
   remarks: undefined,
-  set_warehouse: undefined
+  set_warehouse: session?.warehouse
 });
 
 const toPositiveNumber = (value: number, fallback = 0) => {
@@ -36,6 +40,8 @@ const toPositiveNumber = (value: number, fallback = 0) => {
 
   return Math.max(value, 0);
 };
+
+const toLookupKey = (value?: string) => value?.trim().toLowerCase() ?? "";
 
 const buildNewCartItem = (item: PosItemLookup, warehouse?: string): PosCartItem => ({
   rowId: createEmptyPosRow().rowId,
@@ -55,17 +61,28 @@ const buildNewCartItem = (item: PosItemLookup, warehouse?: string): PosCartItem 
   design: item.design
 });
 
-export const usePosBilling = () => {
-  const [form, setForm] = useState<PosFormState>(createDefaultForm);
+export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
+  const [form, setForm] = useState<PosFormState>(() => createDefaultForm(session));
   const [cartItems, setCartItems] = useState<PosCartItem[]>([createEmptyPosRow()]);
   const [draftDocName, setDraftDocName] = useState<string | null>(null);
   const [lastSubmittedInvoiceName, setLastSubmittedInvoiceName] = useState<string | null>(null);
+
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      customer: prev.customer || session?.default_customer || defaultWalkInCustomer,
+      pos_profile: session?.pos_profile,
+      pos_opening_entry: session?.name,
+      set_warehouse: prev.set_warehouse ?? session?.warehouse
+    }));
+  }, [session?.default_customer, session?.name, session?.pos_profile, session?.warehouse]);
 
   const [createPosInvoice, createState] = useCreatePosInvoiceMutation();
   const [updatePosInvoice, updateState] = useUpdatePosInvoiceMutation();
   const [submitPosInvoice, submitState] = useSubmitPosInvoiceMutation();
   const [fetchStockQty] = useLazyGetItemStockQtyQuery();
   const [fetchPosItemMeta] = useLazyGetPosItemMetaQuery();
+  const [fetchPosItemSellingRate] = useLazyGetPosItemSellingRateQuery();
   const [searchPosItems] = useLazySearchPosItemsQuery();
 
   const paymentModesQuery = useListPosPaymentModesQuery();
@@ -146,30 +163,92 @@ export const usePosBilling = () => {
     return detail;
   }, [fetchPosItemMeta]);
 
-  const applyItemToRow = useCallback(async (rowId: string, item: PosItemLookup) => {
+  const applyItemToRow = useCallback(async (rowId: string, item: PosItemLookup, options?: { incrementQtyOnly?: boolean }) => {
     const warehouse = form.set_warehouse;
-    const detail = await resolveItemMeta(item);
-    const stockQty = await updateStockForRow(item.value, warehouse);
+    const [detail, stockQty, sellingRate] = await Promise.all([
+      resolveItemMeta(item),
+      updateStockForRow(item.value, warehouse),
+      fetchPosItemSellingRate(item.value, true)
+        .unwrap()
+        .catch(() => null)
+    ]);
+
+    const resolvedItemName = item.item_name ?? detail.item_name ?? item.label;
+    const resolvedHsCode = item.hs_code ?? detail.hs_code;
+    const resolvedBarcode = item.barcode ?? detail.barcode;
+    const resolvedUom = item.stock_uom ?? detail.stock_uom ?? "Nos";
+    const resolvedRate =
+      (typeof item.standard_rate === "number" && item.standard_rate > 0 ? item.standard_rate : undefined) ??
+      (typeof detail.standard_rate === "number" && detail.standard_rate > 0 ? detail.standard_rate : undefined) ??
+      (typeof sellingRate === "number" && sellingRate > 0 ? sellingRate : undefined);
 
     syncRows((prev) =>
-      prev.map((row) =>
-        row.rowId === rowId
-          ? {
-              ...row,
-              ...buildNewCartItem(item, warehouse),
-              rowId,
-              qty: row.qty > 0 ? row.qty : 1,
-              item_name: item.item_name ?? detail.item_name ?? item.label ?? row.item_name,
-              hs_code: item.hs_code ?? detail.hs_code ?? row.hs_code,
-              barcode: item.barcode ?? detail.barcode ?? row.barcode,
-              uom: item.stock_uom ?? detail.stock_uom ?? row.uom,
-              rate: item.standard_rate ?? detail.standard_rate ?? row.rate,
-              available_qty: stockQty
-            }
-          : row
-      )
+      {
+        const target = prev.find((row) => row.rowId === rowId);
+        const targetQty = target && target.qty > 0 ? target.qty : 1;
+
+        if (options?.incrementQtyOnly) {
+          const targetSameItem =
+            target && target.item_code && toLookupKey(target.item_code) === toLookupKey(item.value) ? target : undefined;
+          if (targetSameItem) {
+            return prev.map((row) =>
+              row.rowId === rowId
+                ? {
+                    ...row,
+                    item_name: row.item_name ?? resolvedItemName,
+                    hs_code: row.hs_code ?? resolvedHsCode,
+                    barcode: row.barcode ?? resolvedBarcode,
+                    uom: row.uom || resolvedUom,
+                    rate: row.rate > 0 ? row.rate : (resolvedRate ?? row.rate),
+                    qty: (row.qty > 0 ? row.qty : 0) + 1,
+                    available_qty: stockQty
+                  }
+                : row
+            );
+          }
+
+          const duplicate = prev.find(
+            (row) => row.rowId !== rowId && row.item_code && toLookupKey(row.item_code) === toLookupKey(item.value)
+          );
+          if (duplicate) {
+            return prev
+              .filter((row) => row.rowId !== rowId)
+              .map((row) =>
+                row.rowId === duplicate.rowId
+                  ? {
+                      ...row,
+                      item_name: row.item_name ?? resolvedItemName,
+                      hs_code: row.hs_code ?? resolvedHsCode,
+                      barcode: row.barcode ?? resolvedBarcode,
+                      uom: row.uom || resolvedUom,
+                      rate: row.rate > 0 ? row.rate : (resolvedRate ?? row.rate),
+                      qty: (row.qty > 0 ? row.qty : 0) + 1,
+                      available_qty: stockQty
+                    }
+                  : row
+              );
+          }
+        }
+
+        return prev.map((row) =>
+          row.rowId === rowId
+            ? {
+                ...row,
+                ...buildNewCartItem(item, warehouse),
+                rowId,
+                qty: row.qty > 0 ? row.qty : targetQty,
+                item_name: resolvedItemName ?? row.item_name,
+                hs_code: resolvedHsCode ?? row.hs_code,
+                barcode: resolvedBarcode ?? row.barcode,
+                uom: resolvedUom || row.uom,
+                rate: resolvedRate ?? row.rate,
+                available_qty: stockQty
+              }
+            : row
+        );
+      }
     );
-  }, [form.set_warehouse, resolveItemMeta, syncRows, updateStockForRow]);
+  }, [fetchPosItemSellingRate, form.set_warehouse, resolveItemMeta, syncRows, updateStockForRow]);
 
   const addItem = useCallback(async (item: PosItemLookup) => {
     const target = cartItems.find((row) => !row.item_code) ?? cartItems[cartItems.length - 1];
@@ -237,7 +316,7 @@ export const usePosBilling = () => {
     await applyItemToRow(rowId, {
       ...matched,
       barcode: token
-    });
+    }, { incrementQtyOnly: true });
     return true;
   }, [applyItemToRow, lookupItemByBarcode]);
 
@@ -291,9 +370,11 @@ export const usePosBilling = () => {
     }
 
     const payload = toPayload();
-    const saved = draftDocName
-      ? await updatePosInvoice({ name: draftDocName, values: payload }).unwrap()
-      : await createPosInvoice(payload).unwrap();
+    const saved = await createOrUpdatePosBillDraft(() =>
+      draftDocName
+        ? updatePosInvoice({ name: draftDocName, values: payload }).unwrap()
+        : createPosInvoice(payload).unwrap()
+    );
     if (saved.name) {
       setDraftDocName(saved.name);
     }
@@ -312,18 +393,18 @@ export const usePosBilling = () => {
       throw new Error("Unable to submit bill because invoice number is missing.");
     }
 
-    const submitted = await submitPosInvoice(name).unwrap();
+    const submitted = await submitPosBill(() => submitPosInvoice(name).unwrap());
     setDraftDocName(submitted.name ?? name);
     setLastSubmittedInvoiceName(submitted.name ?? name);
     return submitted;
   }, [billableRows, draftDocName, form, saveDraft, submitPosInvoice]);
 
   const resetForNextBill = useCallback(() => {
-    setForm(createDefaultForm());
+    setForm(createDefaultForm(session));
     setCartItems([createEmptyPosRow()]);
     setDraftDocName(null);
     setLastSubmittedInvoiceName(null);
-  }, []);
+  }, [session]);
 
   return {
     form,

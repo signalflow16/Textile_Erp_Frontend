@@ -29,18 +29,15 @@ export function CartTable({
   const hsCodes = useHsCodeSearch();
 
   const resolveProductOptions = (row: PosCartItem) => {
-    const current =
-      row.item_code && row.item_name
-        ? [{ label: row.item_name, value: row.item_code }]
-        : row.item_code
-          ? [{ label: row.item_code, value: row.item_code }]
-          : [];
+    const current = row.item_code && row.item_name ? [{ label: row.item_name, value: row.item_code }] : [];
     const merged = [
       ...current,
-      ...products.options.map((item) => ({
-        label: item.item_name ?? item.label,
-        value: item.value
-      }))
+      ...products.options
+        .filter((item) => typeof item.item_name === "string" && item.item_name.trim().length > 0)
+        .map((item) => ({
+          label: item.item_name!.trim(),
+          value: item.value
+        }))
     ];
 
     const seen = new Set<string>();

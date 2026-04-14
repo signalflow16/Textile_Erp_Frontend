@@ -1,10 +1,9 @@
 "use client";
 
-import { Tabs } from "antd";
-
 import { AppShell } from "@/components/app-shell";
 import { RoleManagement } from "@/components/users/role-management";
 import { UserManagement } from "@/components/users/user-management";
+import { Tabs } from "antd";
 
 export default function UsersPage() {
   return (

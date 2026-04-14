@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { PosBillingPage } from "@/modules/pos/components/PosBillingPage";
+import { PosModulePage } from "@/modules/pos/components/PosModulePage";
 
 export default function PosPage() {
   return (
@@ -9,7 +9,7 @@ export default function PosPage() {
       breadcrumb="Sales > POS Billing"
       subtitle="Create bill quickly for walk-in or registered customers."
     >
-      <PosBillingPage />
+      <PosModulePage />
     </AppShell>
   );
 }

@@ -1,6 +1,10 @@
 import type { PosCartItem, PosFormState } from "@/modules/pos/types/pos";
 
 export const validatePosBeforeSave = (form: PosFormState, items: PosCartItem[]) => {
+  if (!form.pos_opening_entry || !form.pos_profile) {
+    return "Start POS session before billing.";
+  }
+
   if (!form.customer) {
     return "Select a customer before saving.";
   }

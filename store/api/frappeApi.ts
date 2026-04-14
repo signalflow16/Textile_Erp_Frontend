@@ -18,10 +18,27 @@ import type {
 } from "@/types/auth";
 import type { FrappeListResponse, FrappeMessageResponse, SessionStatus } from "@/types/frappe";
 import type {
+  ItemGroupDeleteResponse,
+  ItemGroupDocument,
+  ItemGroupListParams,
+  ItemGroupListResponse,
+  ItemGroupLookups,
+  ItemGroupLookupsParams,
+  ItemGroupMutationPayload,
+  ItemGroupTreeResponse
+} from "@/types/item-group";
+import type {
   ItemDocument,
   ItemListParams,
+  ItemListSortBy,
+  ItemListSortOrder,
+  ItemMutationResponse,
   ItemListResponse,
-  ItemMasterLookups
+  ItemMasterLookups,
+  ItemPriceListParams,
+  ItemPriceListResponse,
+  ItemPriceSummary,
+  ItemVariantAttributeLookups
 } from "@/types/item";
 import { setCsrfToken } from "@/store/features/session/sessionSlice";
 import type { RootState } from "@/store";
@@ -57,6 +74,18 @@ type QueryArg = string | {
 };
 
 type BaseQueryResult = { data: unknown } | { error: BaseQueryError };
+
+type ItemGroupResourceRecord = {
+  name: string;
+  item_group_name?: string | null;
+  parent_item_group?: string | null;
+  is_group?: 0 | 1 | boolean | null;
+  disabled?: 0 | 1 | boolean | null;
+  image?: string | null;
+  description?: string | null;
+  modified?: string | null;
+  creation?: string | null;
+};
 
 const toBaseQueryError = (error: unknown): BaseQueryError => {
   if (error && typeof error === "object" && "data" in error) {
@@ -123,17 +152,17 @@ const toPositiveNumber = (value: unknown): number => {
   return 0;
 };
 
-const mapSortBy = (sortBy: ItemListParams["sortBy"]) => {
+const mapSortBy = (sortBy: ItemListParams["sortBy"], sortOrder: ItemListSortOrder = "desc") => {
+  const direction = sortOrder === "asc" ? "asc" : "desc";
+
   switch (sortBy) {
-    case "modified_asc":
-      return "modified asc";
-    case "item_code_asc":
-      return "item_code asc";
-    case "item_name_asc":
-      return "item_name asc";
-    case "modified_desc":
+    case "item_code":
+      return `item_code ${direction}`;
+    case "item_name":
+      return `item_name ${direction}`;
+    case "modified":
     default:
-      return "modified desc";
+      return `modified ${direction}`;
   }
 };
 
@@ -237,6 +266,339 @@ const extractUserRoles = (payload: unknown): string[] => {
     .filter((entry): entry is string => Boolean(entry));
 };
 
+const toBitFlag = (value: unknown): 0 | 1 => (Boolean(toPositiveNumber(value) || value === true) ? 1 : 0);
+
+const toNullableString = (value: unknown): string | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+};
+
+const serializeItemPriceFilters = (params: ItemPriceListParams) => {
+  const searchParams = new URLSearchParams();
+  searchParams.set("item_code", params.itemCode);
+  searchParams.set("page", String(params.page ?? 1));
+  searchParams.set("page_size", String(params.pageSize ?? 20));
+
+  if (params.priceList?.trim()) {
+    searchParams.set("price_list", params.priceList.trim());
+  }
+
+  if (params.selling) {
+    searchParams.set("selling", params.selling);
+  }
+
+  if (params.buying) {
+    searchParams.set("buying", params.buying);
+  }
+
+  return searchParams.toString();
+};
+
+const itemGroupListFields = [
+  "name",
+  "parent_item_group",
+  "is_group",
+  "modified",
+  "creation"
+];
+
+const mapItemGroupResourceRecord = (record: ItemGroupResourceRecord) => ({
+  name: record.name,
+  item_group_name: toNullableString(record.item_group_name) ?? record.name,
+  parent_item_group: toNullableString(record.parent_item_group),
+  is_group: toBitFlag(record.is_group),
+  // MIGRATION NOTE: Standard ERPNext Item Group does not reliably expose `disabled` in list queries.
+  disabled: 0 as const,
+  image: toNullableString(record.image),
+  description: toNullableString(record.description),
+  modified: toNullableString(record.modified) ?? undefined,
+  creation: toNullableString(record.creation) ?? undefined
+});
+
+const buildItemGroupQueryFilters = (params: {
+  search?: string;
+  parentItemGroup?: string;
+  isGroup?: "all" | "0" | "1";
+  disabled?: "all" | "0" | "1";
+}) => {
+  const filters: unknown[][] = [];
+  const orFilters: unknown[][] = [];
+
+  if (params.parentItemGroup?.trim()) {
+    filters.push(["parent_item_group", "=", params.parentItemGroup.trim()]);
+  }
+
+  if (params.isGroup && params.isGroup !== "all") {
+    filters.push(["is_group", "=", Number(params.isGroup)]);
+  }
+
+  if (params.search?.trim()) {
+    const token = `%${params.search.trim()}%`;
+    orFilters.push(["name", "like", token]);
+  }
+
+  return { filters, orFilters };
+};
+
+const mapItemGroupSort = (sortBy?: string, sortOrder?: "asc" | "desc") => {
+  const allowedField = sortBy === "creation" ? "creation" : sortBy === "item_group_name" ? "name" : "modified";
+  const direction = sortOrder === "asc" ? "asc" : "desc";
+  return `${allowedField} ${direction}`;
+};
+
+const getItemGroupLabel = (record: ReturnType<typeof mapItemGroupResourceRecord>) => record.item_group_name || record.name;
+
+const buildItemGroupChildCounts = (records: Array<ReturnType<typeof mapItemGroupResourceRecord>>) => {
+  const counts: Record<string, number> = {};
+
+  for (const record of records) {
+    if (!record.parent_item_group) {
+      continue;
+    }
+
+    counts[record.parent_item_group] = (counts[record.parent_item_group] ?? 0) + 1;
+  }
+
+  return counts;
+};
+
+const buildItemGroupItemCounts = async (
+  run: (arg: QueryArg) => Promise<BaseQueryResult>,
+  names: string[]
+) => {
+  const uniqueNames = Array.from(new Set(names.filter(Boolean)));
+  if (!uniqueNames.length) {
+    return {};
+  }
+
+  const entries = await Promise.all(
+    uniqueNames.map(async (name) => {
+      const result = await run({
+        url: "/resource/Item",
+        method: "GET",
+        params: {
+          filters: encodeFrappeJson([["item_group", "=", name]]),
+          fields: encodeFrappeJson(["count(name) as total_count"]),
+          limit_page_length: 1
+        }
+      });
+
+      if (hasQueryError(result)) {
+        throw result.error;
+      }
+
+      const totalCount = toPositiveNumber((result.data as FrappeListCountResponse).data?.[0]?.total_count);
+      return [name, totalCount] as const;
+    })
+  );
+
+  return Object.fromEntries(entries);
+};
+
+const deriveItemGroupActionState = (disabled: 0 | 1, childCount: number, itemCount: number) => ({
+  can_delete: childCount === 0 && itemCount === 0,
+  // MIGRATION NOTE: Standard ERPNext Item Group resource has no portable disable/enable lifecycle.
+  can_disable: false,
+  can_enable: false
+});
+
+const toItemGroupDocument = (
+  record: ReturnType<typeof mapItemGroupResourceRecord>,
+  childCounts: Record<string, number>,
+  itemCounts: Record<string, number>
+): ItemGroupDocument => {
+  const children_count = childCounts[record.name] ?? 0;
+  const item_count = itemCounts[record.name] ?? 0;
+
+  return {
+    name: record.name,
+    item_group_name: getItemGroupLabel(record),
+    parent_item_group: record.parent_item_group,
+    is_group: record.is_group,
+    disabled: record.disabled,
+    image: record.image,
+    description: record.description,
+    modified: record.modified,
+    creation: record.creation,
+    children_count,
+    item_count,
+    dependency_counts: {
+      child_groups: children_count,
+      linked_items: item_count
+    },
+    ...deriveItemGroupActionState(record.disabled, children_count, item_count)
+  };
+};
+
+const toLookupOption = (record: ReturnType<typeof mapItemGroupResourceRecord>) => ({
+  label: getItemGroupLabel(record),
+  value: record.name
+});
+
+const getDescendantNames = (records: Array<ReturnType<typeof mapItemGroupResourceRecord>>, currentItemGroup?: string) => {
+  if (!currentItemGroup) {
+    return new Set<string>();
+  }
+
+  const childrenByParent = new Map<string | null, string[]>();
+  for (const record of records) {
+    const key = record.parent_item_group ?? null;
+    const entries = childrenByParent.get(key) ?? [];
+    entries.push(record.name);
+    childrenByParent.set(key, entries);
+  }
+
+  const visited = new Set<string>([currentItemGroup]);
+  const queue = [currentItemGroup];
+
+  while (queue.length) {
+    const current = queue.shift();
+    if (!current) {
+      continue;
+    }
+
+    for (const childName of childrenByParent.get(current) ?? []) {
+      if (visited.has(childName)) {
+        continue;
+      }
+
+      visited.add(childName);
+      queue.push(childName);
+    }
+  }
+
+  return visited;
+};
+
+const filterItemGroupTree = (
+  nodes: ItemGroupTreeResponse["data"],
+  search?: string
+): ItemGroupTreeResponse["data"] => {
+  const token = search?.trim().toLowerCase();
+  if (!token) {
+    return nodes;
+  }
+
+  const filterNode = (node: ItemGroupTreeResponse["data"][number]): ItemGroupTreeResponse["data"][number] | null => {
+    const children = (node.children ?? [])
+      .map(filterNode)
+      .filter((entry): entry is ItemGroupTreeResponse["data"][number] => entry !== null);
+    const selfMatch =
+      node.name.toLowerCase().includes(token) ||
+      node.item_group_name.toLowerCase().includes(token);
+
+    if (!selfMatch && !children.length) {
+      return null;
+    }
+
+    return {
+      ...node,
+      children
+    };
+  };
+
+  return nodes
+    .map(filterNode)
+    .filter((entry): entry is ItemGroupTreeResponse["data"][number] => entry !== null);
+};
+
+const buildItemGroupTree = (
+  records: Array<ReturnType<typeof mapItemGroupResourceRecord>>,
+  childCounts: Record<string, number>,
+  itemCounts: Record<string, number>
+): ItemGroupTreeResponse["data"] => {
+  const byParent = new Map<string | null, ItemGroupTreeResponse["data"]>();
+  const childrenByParent = new Map<string | null, Array<ReturnType<typeof mapItemGroupResourceRecord>>>();
+
+  for (const record of records) {
+    const key = record.parent_item_group ?? null;
+    const entries = childrenByParent.get(key) ?? [];
+    entries.push(record);
+    childrenByParent.set(key, entries);
+  }
+
+  const buildNodes = (parentName: string | null): ItemGroupTreeResponse["data"] =>
+    (childrenByParent.get(parentName) ?? []).map((record) => {
+      const children = buildNodes(record.name);
+      const document = toItemGroupDocument(record, childCounts, itemCounts);
+      const node = {
+        ...document,
+        children
+      };
+      return node;
+    });
+
+  if (!byParent.has(null)) {
+    byParent.set(null, buildNodes(null));
+  }
+
+  return byParent.get(null) ?? [];
+};
+
+const buildItemGroupLookupsPayload = (
+  records: Array<ReturnType<typeof mapItemGroupResourceRecord>>,
+  currentItemGroup?: string
+): ItemGroupLookups => {
+  const descendants = getDescendantNames(records, currentItemGroup);
+  const enabledRecords = records.filter((record) => record.disabled === 0);
+  const leafEnabledRecords = enabledRecords.filter((record) => record.is_group === 0);
+  const parentCandidates = records.filter((record) => record.is_group === 1 && !descendants.has(record.name));
+
+  return {
+    item_groups: enabledRecords.map(toLookupOption),
+    item_groups_all: records.map(toLookupOption),
+    leaf_item_groups: leafEnabledRecords.map(toLookupOption),
+    parent_candidates: parentCandidates.map(toLookupOption),
+    root_candidates: records.filter((record) => !record.parent_item_group).map(toLookupOption),
+    // MIGRATION NOTE: Legacy lookup semantics/schema metadata are no longer returned by ERPNext standard resources.
+    lookup_semantics: {
+      item_groups: "Enabled Item Groups from ERPNext /api/resource/Item Group",
+      item_groups_all: "All Item Groups from ERPNext /api/resource/Item Group",
+      leaf_item_groups: "Enabled leaf Item Groups derived client-side from ERPNext resources",
+      parent_candidates: "Group nodes excluding current node and descendants",
+      root_candidates: "Top-level Item Groups"
+    }
+  };
+};
+
+const fetchAllItemGroups = async (run: (arg: QueryArg) => Promise<BaseQueryResult>) => {
+  const result = await run({
+    url: "/resource/Item Group",
+    method: "GET",
+    params: {
+      fields: encodeFrappeJson(itemGroupListFields),
+      order_by: "name asc",
+      limit_page_length: 5000
+    }
+  });
+
+  if (hasQueryError(result)) {
+    throw result.error;
+  }
+
+  return (result.data as FrappeListResponse<ItemGroupResourceRecord>).data.map(mapItemGroupResourceRecord);
+};
+
+const fetchItemGroupDocument = async (
+  run: (arg: QueryArg) => Promise<BaseQueryResult>,
+  itemGroup: string
+) => {
+  const result = await run({
+    url: `/resource/Item Group/${encodeURIComponent(itemGroup)}`,
+    method: "GET"
+  });
+
+  if (hasQueryError(result)) {
+    throw result.error;
+  }
+
+  return mapItemGroupResourceRecord((result.data as FrappeDocResponse<ItemGroupResourceRecord>).data);
+};
+
 export const frappeApi = createApi({
   reducerPath: "frappeApi",
   refetchOnFocus: true,
@@ -255,7 +617,17 @@ export const frappeApi = createApi({
       return headers;
     }
   }),
-  tagTypes: ["Session", "Item", "ItemList", "Lookups", "Users"],
+  tagTypes: [
+    "Session",
+    "Item",
+    "ItemList",
+    "Lookups", "Users",
+    "ItemPrice",
+    "ItemGroupTree",
+    "ItemGroupList",
+    "ItemGroupDetail",
+    "ItemGroupLookups"
+  ],
   endpoints: (builder) => ({
     signupOwner: builder.mutation<ApiEnvelope<unknown>, SignupOwnerRequest>({
       query: (body) => ({
@@ -556,7 +928,7 @@ export const frappeApi = createApi({
         const limitStart = (params.page - 1) * params.pageSize;
 
         const commonParams: Record<string, string | number> = {
-          order_by: mapSortBy(params.sortBy),
+          order_by: mapSortBy(params.sortBy, params.sortOrder),
           limit_page_length: params.pageSize,
           limit_start: limitStart
         };
@@ -615,6 +987,8 @@ export const frappeApi = createApi({
         return {
           data: {
             data: listData,
+            page: params.page,
+            page_size: params.pageSize,
             total_count: totalCount
           }
         };
@@ -683,37 +1057,367 @@ export const frappeApi = createApi({
           data: {
             item_groups,
             uoms,
-            brands
+            brands,
+            warehouses: [],
+            quality_templates: [],
+            tax_templates: [],
+            price_lists: [],
+            variant_parent_candidates: [],
+            item_attributes: [],
+            collections: [],
+            seasons: [],
+            fabric_types: [],
+            display_categories: []
           }
         };
       },
       providesTags: ["Lookups"]
+    }),
+    getItemGroupLookups: builder.query<ItemGroupLookups, ItemGroupLookupsParams | void>({
+      async queryFn(params, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+
+        try {
+          const records = await fetchAllItemGroups(run);
+          return {
+            data: buildItemGroupLookupsPayload(records, params?.currentItemGroup)
+          };
+        } catch (error) {
+          return { error: toBaseQueryError(error) };
+        }
+      },
+      providesTags: ["ItemGroupLookups"]
+    }),
+    getItemGroupList: builder.query<ItemGroupListResponse, ItemGroupListParams>({
+      async queryFn(params, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+        const limitStart = (params.page - 1) * params.pageSize;
+        const { filters, orFilters } = buildItemGroupQueryFilters(params);
+
+        try {
+          const [allGroups, listResult, countResult] = await Promise.all([
+            fetchAllItemGroups(run),
+            run({
+              url: "/resource/Item Group",
+              method: "GET",
+              params: {
+                fields: encodeFrappeJson(itemGroupListFields),
+                order_by: mapItemGroupSort(params.sortBy, params.sortOrder),
+                limit_start: limitStart,
+                limit_page_length: params.pageSize,
+                ...(filters.length ? { filters: encodeFrappeJson(filters) } : {}),
+                ...(orFilters.length ? { or_filters: encodeFrappeJson(orFilters) } : {})
+              }
+            }),
+            run({
+              url: "/resource/Item Group",
+              method: "GET",
+              params: {
+                fields: encodeFrappeJson(["count(name) as total_count"]),
+                limit_page_length: 1,
+                ...(filters.length ? { filters: encodeFrappeJson(filters) } : {}),
+                ...(orFilters.length ? { or_filters: encodeFrappeJson(orFilters) } : {})
+              }
+            })
+          ]);
+
+          if (hasQueryError(listResult)) {
+            return { error: toBaseQueryError(listResult.error) };
+          }
+
+          if (hasQueryError(countResult)) {
+            return { error: toBaseQueryError(countResult.error) };
+          }
+
+          const listRecords = (listResult.data as FrappeListResponse<ItemGroupResourceRecord>).data.map(mapItemGroupResourceRecord);
+          const childCounts = buildItemGroupChildCounts(allGroups);
+          const itemCounts = await buildItemGroupItemCounts(
+            run,
+            listRecords.map((record) => record.name)
+          );
+
+          return {
+            data: {
+              data: listRecords.map((record) => toItemGroupDocument(record, childCounts, itemCounts)),
+              page: params.page,
+              page_size: params.pageSize,
+              total_count: toPositiveNumber((countResult.data as FrappeListCountResponse).data?.[0]?.total_count),
+              sort_by: params.sortBy ?? "modified",
+              sort_order: params.sortOrder ?? "desc"
+            }
+          };
+        } catch (error) {
+          return { error: toBaseQueryError(error) };
+        }
+      },
+      providesTags: ["ItemGroupList"]
+    }),
+    getItemGroupTree: builder.query<ItemGroupTreeResponse, { search?: string; includeDisabled?: boolean } | void>({
+      async queryFn(params, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+
+        try {
+          const allGroups = await fetchAllItemGroups(run);
+          const records = allGroups;
+          const childCounts = buildItemGroupChildCounts(records);
+          const itemCounts = await buildItemGroupItemCounts(
+            run,
+            records.map((record) => record.name)
+          );
+          const tree = buildItemGroupTree(records, childCounts, itemCounts);
+
+          return {
+            data: {
+              // MIGRATION NOTE: Search now filters the client-built ERPNext tree instead of a legacy custom endpoint.
+              data: filterItemGroupTree(tree, params?.search)
+            }
+          };
+        } catch (error) {
+          return { error: toBaseQueryError(error) };
+        }
+      },
+      providesTags: ["ItemGroupTree"]
+    }),
+    getItemGroup: builder.query<ItemGroupDocument, string>({
+      async queryFn(itemGroup, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+
+        try {
+          const [allGroups, record] = await Promise.all([
+            fetchAllItemGroups(run),
+            fetchItemGroupDocument(run, itemGroup)
+          ]);
+          const childCounts = buildItemGroupChildCounts(allGroups);
+          const itemCounts = await buildItemGroupItemCounts(run, [record.name]);
+
+          return {
+            data: toItemGroupDocument(record, childCounts, itemCounts)
+          };
+        } catch (error) {
+          return { error: toBaseQueryError(error) };
+        }
+      },
+      providesTags: (_result, _error, itemGroup) => [{ type: "ItemGroupDetail", id: itemGroup }]
     }),
     getItem: builder.query<ItemDocument, string>({
       query: (itemCode) => `/resource/Item/${encodeURIComponent(itemCode)}`,
       transformResponse: (response: { data: ItemDocument }) => response.data,
       providesTags: (_result, _error, itemCode) => [{ type: "Item", id: itemCode }]
     }),
+    getItemVariantAttributeLookups: builder.query<ItemVariantAttributeLookups, string | void>({
+      query: (templateItem) =>
+        templateItem
+          ? `/method/textile_erp.api.item_variant_attribute_lookups?template_item=${encodeURIComponent(templateItem)}`
+          : "/method/textile_erp.api.item_variant_attribute_lookups",
+      transformResponse: (response: FrappeMessageResponse<ItemVariantAttributeLookups>) => response.message,
+      providesTags: ["Lookups"]
+    }),
+    getItemPriceSummary: builder.query<ItemPriceSummary, string>({
+      query: (itemCode) =>
+        `/method/textile_erp.api.item_price_summary?item_code=${encodeURIComponent(itemCode)}`,
+      transformResponse: (response: FrappeMessageResponse<ItemPriceSummary>) => response.message,
+      providesTags: (_result, _error, itemCode) => [{ type: "ItemPrice", id: itemCode }]
+    }),
+    getItemPriceList: builder.query<ItemPriceListResponse, ItemPriceListParams>({
+      query: (params) => `/method/textile_erp.api.item_price_list?${serializeItemPriceFilters(params)}`,
+      transformResponse: (response: FrappeMessageResponse<ItemPriceListResponse>) => response.message,
+      providesTags: (_result, _error, arg) => [{ type: "ItemPrice", id: arg.itemCode }]
+    }),
     createItem: builder.mutation<ItemDocument, ItemDocument>({
-      query: (body) => ({
-        url: "/resource/Item",
+      query: (payload) => ({
+        url: "/method/textile_erp.api.item_save",
         method: "POST",
-        data: body
+        data: { payload }
       }),
-      transformResponse: (response: { data: ItemDocument }) => response.data,
-      invalidatesTags: ["ItemList"]
+      transformResponse: (response: FrappeMessageResponse<ItemMutationResponse>) => response.message.item,
+      invalidatesTags: ["ItemList", "Lookups"]
     }),
     updateItem: builder.mutation<ItemDocument, { itemCode: string; values: Partial<ItemDocument> }>({
-      query: ({ itemCode, values }) => ({
-        url: `/resource/Item/${encodeURIComponent(itemCode)}`,
-        method: "PUT",
-        data: values
+      query: ({ itemCode, values: payload }) => ({
+        url: "/method/textile_erp.api.item_update",
+        method: "POST",
+        data: {
+          item_code: itemCode,
+          payload
+        }
       }),
-      transformResponse: (response: { data: ItemDocument }) => response.data,
+      transformResponse: (response: FrappeMessageResponse<ItemMutationResponse>) => response.message.item,
       invalidatesTags: (_result, _error, arg) => [
         "ItemList",
         "Lookups",
-        { type: "Item", id: arg.itemCode }
+        { type: "Item", id: arg.itemCode },
+        { type: "ItemPrice", id: arg.itemCode }
+      ]
+    }),
+    createItemGroup: builder.mutation<ItemGroupDocument, ItemGroupMutationPayload>({
+      async queryFn(payload, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+
+        try {
+          const createResult = await run({
+            url: "/resource/Item Group",
+            method: "POST",
+            data: payload
+          });
+
+          if (hasQueryError(createResult)) {
+            return { error: toBaseQueryError(createResult.error) };
+          }
+
+          const createdRecord = mapItemGroupResourceRecord(
+            (createResult.data as FrappeDocResponse<ItemGroupResourceRecord>).data
+          );
+          const allGroups = await fetchAllItemGroups(run);
+          const childCounts = buildItemGroupChildCounts(allGroups);
+          const itemCounts = await buildItemGroupItemCounts(run, [createdRecord.name]);
+
+          return {
+            // MIGRATION NOTE: Item Group creation now posts directly to ERPNext standard resource APIs.
+            data: toItemGroupDocument(createdRecord, childCounts, itemCounts)
+          };
+        } catch (error) {
+          return { error: toBaseQueryError(error) };
+        }
+      },
+      invalidatesTags: ["ItemGroupTree", "ItemGroupList", "ItemGroupLookups"]
+    }),
+    updateItemGroup: builder.mutation<
+      ItemGroupDocument,
+      { itemGroup: string; values: ItemGroupMutationPayload }
+    >({
+      async queryFn({ itemGroup, values }, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+
+        try {
+          const updateResult = await run({
+            url: `/resource/Item Group/${encodeURIComponent(itemGroup)}`,
+            method: "PUT",
+            data: values
+          });
+
+          if (hasQueryError(updateResult)) {
+            return { error: toBaseQueryError(updateResult.error) };
+          }
+
+          const updatedRecord = mapItemGroupResourceRecord(
+            (updateResult.data as FrappeDocResponse<ItemGroupResourceRecord>).data
+          );
+          const allGroups = await fetchAllItemGroups(run);
+          const childCounts = buildItemGroupChildCounts(allGroups);
+          const itemCounts = await buildItemGroupItemCounts(run, [updatedRecord.name]);
+
+          return {
+            data: toItemGroupDocument(updatedRecord, childCounts, itemCounts)
+          };
+        } catch (error) {
+          return { error: toBaseQueryError(error) };
+        }
+      },
+      invalidatesTags: (_result, _error, arg) => [
+        "ItemGroupTree",
+        "ItemGroupList",
+        "ItemGroupLookups",
+        { type: "ItemGroupDetail", id: arg.itemGroup }
+      ]
+    }),
+    toggleItemGroupDisabled: builder.mutation<
+      ItemGroupDocument,
+      { itemGroup: string; disabled: boolean }
+    >({
+      async queryFn() {
+        return {
+          error: {
+            status: 400,
+            data: {
+              message: "Disable/enable is not supported by the standard ERPNext Item Group resource."
+            }
+          }
+        };
+      },
+      invalidatesTags: (_result, _error, arg) => [
+        "ItemGroupTree",
+        "ItemGroupList",
+        "ItemGroupLookups",
+        { type: "ItemGroupDetail", id: arg.itemGroup }
+      ]
+    }),
+    deleteItemGroup: builder.mutation<ItemGroupDeleteResponse, string>({
+      async queryFn(itemGroup, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+
+        try {
+          const allGroups = await fetchAllItemGroups(run);
+          const childCounts = buildItemGroupChildCounts(allGroups);
+          const itemCounts = await buildItemGroupItemCounts(run, [itemGroup]);
+          const deleteResult = await run({
+            url: `/resource/Item Group/${encodeURIComponent(itemGroup)}`,
+            method: "DELETE"
+          });
+
+          if (hasQueryError(deleteResult)) {
+            return { error: toBaseQueryError(deleteResult.error) };
+          }
+
+          return {
+            data: {
+              deleted: true,
+              item_group: itemGroup,
+              dependency_counts: {
+                child_groups: childCounts[itemGroup] ?? 0,
+                linked_items: itemCounts[itemGroup] ?? 0
+              }
+            }
+          };
+        } catch (error) {
+          return { error: toBaseQueryError(error) };
+        }
+      },
+      invalidatesTags: (_result, _error, itemGroup) => [
+        "ItemGroupTree",
+        "ItemGroupList",
+        "ItemGroupLookups",
+        { type: "ItemGroupDetail", id: itemGroup }
+      ]
+    }),
+    moveItemGroup: builder.mutation<
+      ItemGroupDocument,
+      { itemGroup: string; newParentItemGroup?: string | null }
+    >({
+      async queryFn({ itemGroup, newParentItemGroup }, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+
+        try {
+          const moveResult = await run({
+            url: `/resource/Item Group/${encodeURIComponent(itemGroup)}`,
+            method: "PUT",
+            data: {
+              parent_item_group: newParentItemGroup ?? ""
+            }
+          });
+
+          if (hasQueryError(moveResult)) {
+            return { error: toBaseQueryError(moveResult.error) };
+          }
+
+          const movedRecord = mapItemGroupResourceRecord(
+            (moveResult.data as FrappeDocResponse<ItemGroupResourceRecord>).data
+          );
+          const allGroups = await fetchAllItemGroups(run);
+          const childCounts = buildItemGroupChildCounts(allGroups);
+          const itemCounts = await buildItemGroupItemCounts(run, [movedRecord.name]);
+
+          return {
+            data: toItemGroupDocument(movedRecord, childCounts, itemCounts)
+          };
+        } catch (error) {
+          return { error: toBaseQueryError(error) };
+        }
+      },
+      invalidatesTags: (_result, _error, arg) => [
+        "ItemGroupTree",
+        "ItemGroupList",
+        "ItemGroupLookups",
+        { type: "ItemGroupDetail", id: arg.itemGroup }
       ]
     }),
     getBrands: builder.query<{ label: string; value: string }[], void>({
@@ -752,19 +1456,31 @@ export const frappeApi = createApi({
 export const {
   useAuthMeQuery,
   useCreateUserAccountMutation,
+  useCreateItemGroupMutation,
   useCreateItemMutation,
   useLazyAuthMeQuery,
+  useDeleteItemGroupMutation,
   useGetHealthQuery,
+  useGetItemGroupListQuery,
+  useGetItemGroupLookupsQuery,
+  useGetItemGroupQuery,
+  useGetItemGroupTreeQuery,
   useGetItemListQuery,
   useGetItemLookupsQuery,
+  useGetItemPriceListQuery,
+  useGetItemPriceSummaryQuery,
   useGetItemQuery,
   useGetRolesMasterQuery,
   useGetRoleOptionsQuery,
+  useGetItemVariantAttributeLookupsQuery,
   useGetSessionQuery,
   useListUsersQuery,
   useLoginMutation,
   useLogoutUserMutation,
   useSignupOwnerMutation,
+  useMoveItemGroupMutation,
+  useToggleItemGroupDisabledMutation,
+  useUpdateItemGroupMutation,
   useUpdateItemMutation,
   useCreateRoleMutation
 } = frappeApi;

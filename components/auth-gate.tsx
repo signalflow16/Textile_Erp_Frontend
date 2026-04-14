@@ -105,19 +105,14 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
     }
 
     if (isPublicRoute && me) {
-      const requestedRedirect = searchParams.get("redirect");
-      const safeRedirect =
-        requestedRedirect && requestedRedirect.startsWith("/") ? requestedRedirect : "/stock/items";
-      router.replace(safeRedirect);
+      router.replace("/stock");
       return;
     }
 
-    if (!isPublicRoute && !me && hasAuthCheckCompleted && isSessionInvalid) {
-      const redirectTo = pathname || "/stock/items";
-      const timer = window.setTimeout(() => {
-        router.replace(`/signin?redirect=${encodeURIComponent(redirectTo)}`);
-      }, 900);
-      return () => window.clearTimeout(timer);
+    const isVerifying = authMeState.isFetching;
+    if (!isPublicRoute && !me && !isVerifying) {
+      const redirectTo = pathname || "/stock";
+      router.replace(`/signin?redirect=${encodeURIComponent(redirectTo)}`);
     }
   }, [
     hasAuthCheckCompleted,

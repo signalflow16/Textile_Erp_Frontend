@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback } from "react";
+import Link from "next/link";
 import { App, Button, Card, Input, Select, Space, Typography } from "antd";
 
 import { extractApiErrorMessage } from "@/lib/api-errors";
@@ -11,14 +12,16 @@ import { CustomerSelector } from "@/modules/pos/components/CustomerSelector";
 import { PaymentSection } from "@/modules/pos/components/PaymentSection";
 import { PosHeader } from "@/modules/pos/components/PosHeader";
 import { PosPrintButton } from "@/modules/pos/components/PosPrintButton";
+import { PosSessionBanner } from "@/modules/pos/components/PosSessionBanner";
 import { usePosBilling } from "@/modules/pos/hooks/usePosBilling";
 import { usePosCustomerSearch } from "@/modules/pos/hooks/usePosCustomerSearch";
+import type { PosSession } from "@/modules/pos/types/pos";
 
-export function PosBillingPage() {
+export function PosBillingPage({ session, onRefreshSession }: { session?: PosSession | null; onRefreshSession?: () => void }) {
   const { Text } = Typography;
   const { message, modal } = App.useApp();
   const customers = usePosCustomerSearch();
-  const billing = usePosBilling();
+  const billing = usePosBilling({ session });
 
   const handleSaveDraft = useCallback(async () => {
     try {
@@ -50,8 +53,24 @@ export function PosBillingPage() {
 
   const isActionBusy = billing.isSaving || billing.isSubmitting;
 
+  if (!session) {
+    return (
+      <Card>
+        <Space direction="vertical" size={8}>
+          <Text strong>Start POS session before billing</Text>
+          <Text type="secondary">Create a POS Opening Entry to begin billing.</Text>
+          <Link href="/pos/opening">
+            <Button type="primary">Start Session</Button>
+          </Link>
+        </Space>
+      </Card>
+    );
+  }
+
   return (
     <div className="page-stack">
+      <PosSessionBanner session={session} onRefresh={onRefreshSession} />
+
       <Card>
         <PosHeader
           isSaving={billing.isSaving}

@@ -25,3 +25,5 @@ export const openErpNextPrintPreview = (doctype: string, name: string) => {
     window.open(url, "_blank", "noopener,noreferrer");
   }
 };
+
+export const openErpnextPrintPreview = openErpNextPrintPreview;

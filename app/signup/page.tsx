@@ -84,7 +84,9 @@ export default function SignUpPage() {
           })
         );
       }
-      router.replace("/stock/items");
+
+      dispatch(setAuthMe(meResponse.data));
+      router.replace("/stock");
     } catch (error) {
       setErrorMessage(extractApiErrorMessage(error, "Unable to complete owner signup."));
     }

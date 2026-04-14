@@ -36,7 +36,7 @@ export function BillPreviewPanel({
                   <Text strong>{calcLineAmount(row).toFixed(2)}</Text>
                 </div>
                 <Text type="secondary">
-                  {row.qty} x {row.rate.toFixed(2)} {row.hs_code ? `• HS ${row.hs_code}` : ""}
+                  {row.qty} x {row.rate.toFixed(2)} {row.hs_code ? `| HS ${row.hs_code}` : ""}
                 </Text>
               </div>
             </List.Item>

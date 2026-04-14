@@ -18,6 +18,8 @@ export const toPosInvoicePayload = (form: PosFormState, items: PosCartItem[]): P
     due_date: form.posting_date,
     is_pos: 1,
     update_stock: 1,
+    pos_profile: clean(form.pos_profile),
+    pos_opening_entry: clean(form.pos_opening_entry),
     set_warehouse: clean(form.set_warehouse),
     remarks: clean(form.remarks),
     mode_of_payment: clean(form.mode_of_payment),
