@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { StoreHydratedItemPage } from "@/components/stock/store-hydrated-item-page";
+import { StoreHydratedItemPage } from "@/modules/stock/components/store-hydrated-item-page";
 
 export default async function EditItemPage({
   params

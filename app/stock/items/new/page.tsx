@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { ItemForm } from "@/components/stock/item-form";
+import { ItemForm } from "@/modules/stock/components/item-form";
 
 export default function NewItemPage() {
   return (
