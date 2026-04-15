@@ -1,20 +1,28 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { WarehouseEditor } from "@/modules/stock/components/warehouses/editor";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function CreateWarehousePage({
-  searchParams
-}: {
-  searchParams: Promise<{ parent?: string }>;
-}) {
-  const params = await searchParams;
+export default function CreateWarehousePage() {
+  const { setConfig } = useAppShell();
+  const searchParams = useSearchParams();
+  const parent = searchParams.get("parent");
 
-  return (
-    <AppShell
-      title="Create Warehouse"
-      breadcrumb="Stock > Warehouses > Create"
-      subtitle="Create a new warehouse from a document-style page."
-    >
-      <WarehouseEditor mode="create" parentWarehouse={params.parent ? decodeURIComponent(params.parent) : undefined} />
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: "Create Warehouse",
+      subtitle: "Create a new warehouse from a document-style page."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <WarehouseEditor mode="create" parentWarehouse={parent ? decodeURIComponent(parent) : undefined} />;
 }

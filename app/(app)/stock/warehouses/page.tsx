@@ -1,20 +1,28 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { WarehouseWorkspace } from "@/modules/stock/components/warehouses/workspace";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function StockWarehousesRoute({
-  searchParams
-}: {
-  searchParams: Promise<{ selected?: string }>;
-}) {
-  const params = await searchParams;
+export default function StockWarehousesRoute() {
+  const { setConfig } = useAppShell();
+  const searchParams = useSearchParams();
+  const selected = searchParams.get("selected");
 
-  return (
-    <AppShell
-      title="Warehouses"
-      breadcrumb="Stock > Warehouses"
-      subtitle="Tree-based warehouse management with page-based edit and root-only child creation."
-    >
-      <WarehouseWorkspace selectedWarehouse={params.selected ? decodeURIComponent(params.selected) : undefined} />
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: "Warehouses",
+      subtitle: "Tree-based warehouse management with page-based edit and root-only child creation."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <WarehouseWorkspace selectedWarehouse={selected ? decodeURIComponent(selected) : undefined} />;
 }

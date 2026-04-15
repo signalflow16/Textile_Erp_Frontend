@@ -1,20 +1,28 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { ItemGroupWorkspace } from "@/modules/stock/components/item-groups/workspace";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function ItemGroupsPage({
-  searchParams
-}: {
-  searchParams: Promise<{ selected?: string }>;
-}) {
-  const params = await searchParams;
+export default function ItemGroupsPage() {
+  const { setConfig } = useAppShell();
+  const searchParams = useSearchParams();
+  const selected = searchParams.get("selected");
 
-  return (
-    <AppShell
-      title="Item Groups"
-      breadcrumb="Stock > Item Groups"
-      subtitle="Tree-based item group management with inline actions and page-based create/edit flows."
-    >
-      <ItemGroupWorkspace selectedGroup={params.selected ? decodeURIComponent(params.selected) : undefined} />
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: "Item Groups",
+      subtitle: "Tree-based item group management with inline actions and page-based create/edit flows."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <ItemGroupWorkspace selectedGroup={selected ? decodeURIComponent(selected) : undefined} />;
 }

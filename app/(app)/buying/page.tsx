@@ -1,15 +1,25 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { BuyingDashboard } from "@/modules/buying/components/BuyingDashboard";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function BuyingDashboardPage() {
-  return (
-    <AppShell
-      section="Buying"
-      title="Buying Dashboard"
-      breadcrumb="Buying > Dashboard"
-      subtitle="Track textile procurement from demand planning through ordering, receipt, and supplier billing."
-    >
-      <BuyingDashboard />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "Buying Dashboard",
+      subtitle: "Track textile procurement from demand planning through ordering, receipt, and supplier billing."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <BuyingDashboard />;
 }

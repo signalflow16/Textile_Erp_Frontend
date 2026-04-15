@@ -1,13 +1,23 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { StockPartiesPage } from "@/modules/stock/components/stock-parties-page";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function StockPartiesRoute() {
-  return (
-    <AppShell
-      title="Parties"
-      breadcrumb="Stock > Parties"
-    >
-      <StockPartiesPage />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "Parties"
+    });
+
+    return () => {
+      setConfig({
+        title: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <StockPartiesPage />;
 }

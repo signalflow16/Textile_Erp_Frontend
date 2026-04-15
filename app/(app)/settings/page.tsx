@@ -1,10 +1,23 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { UnderDevelopmentPage } from "@/components/under-development-page";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function SettingsPage() {
-  return (
-    <AppShell title="ERPNext Settings" breadcrumb="ERPNext Settings">
-      <UnderDevelopmentPage />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "ERPNext Settings"
+    });
+
+    return () => {
+      setConfig({
+        title: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <UnderDevelopmentPage />;
 }

@@ -1,10 +1,25 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { MaterialRequestForm } from "@/modules/buying/components/MaterialRequestForm";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function NewMaterialRequestPage() {
-  return (
-    <AppShell section="Buying" title="Create Material Request" breadcrumb="Buying > Material Requests > New" subtitle="Capture demand before vendor procurement.">
-      <MaterialRequestForm />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "Create Material Request",
+      subtitle: "Capture demand before vendor procurement."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <MaterialRequestForm />;
 }

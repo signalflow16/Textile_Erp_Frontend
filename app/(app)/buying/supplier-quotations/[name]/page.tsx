@@ -1,27 +1,31 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { SupplierQuotationDetail } from "@/modules/buying/components/SupplierQuotationDetail";
 import { SupplierQuotationForm } from "@/modules/buying/components/SupplierQuotationForm";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function SupplierQuotationDetailPage({
-  params,
-  searchParams
-}: {
-  params: Promise<{ name: string }>;
-  searchParams: Promise<{ edit?: string }>;
-}) {
-  const { name } = await params;
-  const query = await searchParams;
-  const decoded = decodeURIComponent(name);
-  const editMode = query.edit === "1";
+export default function SupplierQuotationDetailPage() {
+  const { setConfig } = useAppShell();
+  const params = useParams<{ name: string }>();
+  const searchParams = useSearchParams();
+  const decoded = decodeURIComponent(params.name);
+  const editMode = searchParams.get("edit") === "1";
 
-  return (
-    <AppShell
-      section="Buying"
-      title={editMode ? `Edit Supplier Quotation ${decoded}` : `Supplier Quotation ${decoded}`}
-      breadcrumb={`Buying > Supplier Quotations > ${decoded}`}
-      subtitle="Supplier quotation captures vendor-specific offers."
-    >
-      {editMode ? <SupplierQuotationForm name={decoded} /> : <SupplierQuotationDetail name={decoded} />}
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: editMode ? `Edit Supplier Quotation ${decoded}` : `Supplier Quotation ${decoded}`,
+      subtitle: "Supplier quotation captures vendor-specific offers."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [decoded, editMode, setConfig]);
+
+  return editMode ? <SupplierQuotationForm name={decoded} /> : <SupplierQuotationDetail name={decoded} />;
 }

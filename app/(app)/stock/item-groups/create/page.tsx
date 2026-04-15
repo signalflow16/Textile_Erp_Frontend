@@ -1,20 +1,28 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { ItemGroupEditor } from "@/modules/stock/components/item-groups/editor";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function CreateItemGroupPage({
-  searchParams
-}: {
-  searchParams: Promise<{ parent?: string }>;
-}) {
-  const params = await searchParams;
+export default function CreateItemGroupPage() {
+  const { setConfig } = useAppShell();
+  const searchParams = useSearchParams();
+  const parent = searchParams.get("parent");
 
-  return (
-    <AppShell
-      title="Create Item Group"
-      breadcrumb="Stock > Item Groups > Create"
-      subtitle="Create a new stock hierarchy node with a page-based workflow."
-    >
-      <ItemGroupEditor mode="create" parentItemGroup={params.parent ? decodeURIComponent(params.parent) : undefined} />
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: "Create Item Group",
+      subtitle: "Create a new stock hierarchy node with a page-based workflow."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <ItemGroupEditor mode="create" parentItemGroup={parent ? decodeURIComponent(parent) : undefined} />;
 }

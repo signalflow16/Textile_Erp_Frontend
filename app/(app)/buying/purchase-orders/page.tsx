@@ -1,10 +1,25 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { PurchaseOrderList } from "@/modules/buying/components/PurchaseOrderList";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function PurchaseOrdersPage() {
-  return (
-    <AppShell section="Buying" title="Purchase Orders" breadcrumb="Buying > Purchase Orders" subtitle="Confirm supplier procurement and schedule delivery.">
-      <PurchaseOrderList />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "Purchase Orders",
+      subtitle: "Confirm supplier procurement and schedule delivery."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <PurchaseOrderList />;
 }
