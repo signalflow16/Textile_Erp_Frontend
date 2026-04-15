@@ -19,6 +19,8 @@ const toItemRows = (items: unknown, options?: { withRate?: boolean; withAmount?:
           item_code: typeof row.item_code === "string" ? row.item_code : undefined,
           qty: Number(row.qty ?? 1),
           uom: typeof row.uom === "string" ? row.uom : undefined,
+          conversion_factor:
+            typeof row.conversion_factor === "number" && Number.isFinite(row.conversion_factor) ? row.conversion_factor : 1,
           warehouse: typeof row.warehouse === "string" ? row.warehouse : undefined,
           schedule_date: typeof row.schedule_date === "string" ? row.schedule_date : undefined,
           description: typeof row.description === "string" ? row.description : undefined,

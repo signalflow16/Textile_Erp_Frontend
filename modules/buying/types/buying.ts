@@ -59,6 +59,7 @@ export type BuyingItemRow = {
   description?: string;
   qty: number;
   uom: string;
+  conversion_factor?: number;
   warehouse?: string;
   schedule_date?: string;
   rate?: number;

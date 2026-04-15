@@ -29,7 +29,7 @@ const defaultByKind = (kind: BuyingFormKind): DocLike => {
     return {
       material_request_type: "Purchase",
       transaction_date: today(),
-      items: [{ qty: 1 }]
+      items: [{ qty: 1, conversion_factor: 1 }]
     };
   }
 
@@ -37,35 +37,35 @@ const defaultByKind = (kind: BuyingFormKind): DocLike => {
     return {
       transaction_date: today(),
       suppliers: [{ supplier: undefined }],
-      items: [{ qty: 1 }]
+      items: [{ qty: 1, conversion_factor: 1 }]
     };
   }
 
   if (kind === "supplier-quotation") {
     return {
       transaction_date: today(),
-      items: [{ qty: 1 }]
+      items: [{ qty: 1, conversion_factor: 1 }]
     };
   }
 
   if (kind === "purchase-order") {
     return {
       schedule_date: today(),
-      items: [{ qty: 1 }]
+      items: [{ qty: 1, conversion_factor: 1 }]
     };
   }
 
   if (kind === "purchase-receipt") {
     return {
       posting_date: today(),
-      items: [{ qty: 1 }]
+      items: [{ qty: 1, conversion_factor: 1 }]
     };
   }
 
   return {
     posting_date: today(),
     due_date: today(),
-    items: [{ qty: 1 }]
+    items: [{ qty: 1, conversion_factor: 1 }]
   };
 };
 

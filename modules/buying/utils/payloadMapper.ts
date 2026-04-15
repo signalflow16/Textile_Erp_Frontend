@@ -13,6 +13,21 @@ const clean = (value?: string) => {
   return trimmed ? trimmed : undefined;
 };
 
+const toNumberOrFallback = (value: unknown, fallback: number) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return fallback;
+};
+
 const mapItems = (items: BuyingItemRow[]) =>
   items
     .filter((item) => clean(item.item_code) && Number(item.qty) > 0)
@@ -20,6 +35,7 @@ const mapItems = (items: BuyingItemRow[]) =>
       item_code: clean(item.item_code),
       qty: Number(item.qty),
       uom: clean(item.uom),
+      conversion_factor: toNumberOrFallback(item.conversion_factor, 1),
       warehouse: clean(item.warehouse),
       schedule_date: clean(item.schedule_date),
       description: clean(item.description),

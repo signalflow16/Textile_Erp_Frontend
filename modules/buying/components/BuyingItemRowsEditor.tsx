@@ -134,7 +134,8 @@ export function BuyingItemRowsEditor({
               add({
                 item_code: undefined,
                 qty: 1,
-                uom: undefined
+                uom: undefined,
+                conversion_factor: 1
               })
             }
           >
