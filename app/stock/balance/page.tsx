@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { StockBalancePage } from "@/components/stock/reports/stock-balance-page";
+import { StockBalancePage } from "@/modules/stock/components/reports/stock-balance-page";
 
 export default function StockBalanceRoute() {
   return (

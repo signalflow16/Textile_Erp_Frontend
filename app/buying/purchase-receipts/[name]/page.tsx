@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { DocumentEditorPage } from "@/components/documents/document-editor-page";
+import { DocumentEditorPage } from "@/modules/shared/document/components/document-editor-page";
 
 export default async function PurchaseReceiptDetailRoute({ params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;

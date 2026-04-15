@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { DocumentListPage } from "@/components/documents/document-list-page";
+import { DocumentListPage } from "@/modules/shared/document/components/document-list-page";
 
 export default function SellingPage() {
   return (

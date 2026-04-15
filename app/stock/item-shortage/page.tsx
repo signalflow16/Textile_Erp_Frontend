@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { ItemShortagePage } from "@/components/stock/reports/item-shortage-page";
+import { ItemShortagePage } from "@/modules/stock/components/reports/item-shortage-page";
 
 export default function ItemShortageRoute() {
   return (

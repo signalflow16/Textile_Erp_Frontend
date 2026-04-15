@@ -2,8 +2,8 @@
 
 import { Form, Input, Select } from "antd";
 
-import type { CustomerCreateValues, SupplierCreateValues } from "@/types/master-data";
-import type { LookupOption } from "@/types/item";
+import type { CustomerCreateValues, SupplierCreateValues } from "@/modules/stock/types/master-data";
+import type { LookupOption } from "@/modules/stock/types/item";
 
 const supplierTypeOptions = [
   { label: "Company", value: "Company" },

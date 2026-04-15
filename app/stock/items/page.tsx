@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { StockItemsPage } from "@/components/stock/stock-items-page";
+import { StockItemsPage } from "@/modules/stock/components/stock-items-page";
 
 export default function ItemsPage() {
   return (

@@ -1,4 +1,4 @@
-import { frappeApi } from "@/store/api/frappeApi";
+import { frappeApi } from "@/core/api/frappeApi";
 import type {
   BuyingDashboardSummary,
   BuyingDocumentSummary,

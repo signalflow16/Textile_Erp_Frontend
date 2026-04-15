@@ -10,15 +10,15 @@ import {
   isRetryableAuthError,
   isUnauthorizedAuthError,
   waitFor
-} from "@/lib/auth-session";
+} from "@/core/auth/auth-session";
 import { extractApiErrorMessage, extractEnvelopeMessage } from "@/lib/api-errors";
-import { useAppDispatch } from "@/store/hooks";
+import { useAppDispatch } from "@/core/store/hooks";
 import {
   useLazyAuthMeQuery,
   useLoginMutation,
   useSignupOwnerMutation
-} from "@/store/api/frappeApi";
-import { clearAuth, markAuthenticated, setAuthHydrated, setAuthMe } from "@/store/features/auth/authSlice";
+} from "@/core/api/frappeApi";
+import { clearAuth, markAuthenticated, setAuthHydrated, setAuthMe } from "@/core/store/authSlice";
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -227,3 +227,4 @@ export default function SignUpPage() {
     </div>
   );
 }
+

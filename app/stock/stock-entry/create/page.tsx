@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { StockEntryForm } from "@/components/stock/stock-entry-form";
+import { StockEntryForm } from "@/modules/stock/components/stock-entry-form";
 
 export default function StockEntryCreatePage() {
   return (

@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { StockPartiesPage } from "@/components/stock/stock-parties-page";
+import { StockPartiesPage } from "@/modules/stock/components/stock-parties-page";
 
 export default function StockPartiesRoute() {
   return (

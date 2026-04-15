@@ -8,7 +8,7 @@ import {
   retryAxiosRequest,
   shouldRetryTransientError,
   type RetryableRequestConfig
-} from "@/lib/auth-runtime";
+} from "@/core/auth/auth-runtime";
 
 type AxiosBaseQueryArgs = {
   url: string;

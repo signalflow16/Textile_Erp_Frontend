@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from "react";
 
-import { isUnauthorizedAuthError } from "@/lib/auth-session";
-import { useLazyAuthMeQuery } from "@/store/api/frappeApi";
-import { clearAuth } from "@/store/features/auth/authSlice";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { isUnauthorizedAuthError } from "@/core/auth/auth-session";
+import { useLazyAuthMeQuery } from "@/core/api/frappeApi";
+import { clearAuth } from "@/core/store/authSlice";
+import { useAppDispatch, useAppSelector } from "@/core/store/hooks";
 
 const SESSION_KEEP_ALIVE_INTERVAL_MS = 10 * 60 * 1000;
 
@@ -59,3 +59,4 @@ export const useSessionKeepAlive = () => {
     };
   }, [dispatch, hydrated, status, triggerAuthMe]);
 };
+

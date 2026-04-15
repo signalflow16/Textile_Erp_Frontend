@@ -2,8 +2,8 @@
 
 import { Checkbox, Form, Input, Select } from "antd";
 
-import type { WarehouseCreateValues } from "@/types/master-data";
-import type { LookupOption } from "@/types/item";
+import type { WarehouseCreateValues } from "@/modules/stock/types/master-data";
+import type { LookupOption } from "@/modules/stock/types/item";
 
 export function WarehouseCreateForm({
   form,

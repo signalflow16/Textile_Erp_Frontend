@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { ItemPricePanel } from "@/components/stock/item-price-panel";
+import { ItemPricePanel } from "@/modules/stock/components/item-price-panel";
 
 export default async function ItemPricesPage({
   params

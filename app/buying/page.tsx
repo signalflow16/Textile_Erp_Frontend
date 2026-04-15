@@ -1,15 +1,15 @@
 import { AppShell } from "@/components/app-shell";
-import { DocumentListPage } from "@/components/documents/document-list-page";
+import { BuyingDashboard } from "@/modules/buying/components/BuyingDashboard";
 
 export default function BuyingDashboardPage() {
   return (
     <AppShell
       section="Buying"
-      title="Purchase Receipts"
-      breadcrumb="Buying > Purchase Receipts"
-      subtitle="Receive supplier stock into warehouses with draft, submit, and cancel lifecycle support."
+      title="Buying Dashboard"
+      breadcrumb="Buying > Dashboard"
+      subtitle="Track textile procurement from demand planning through ordering, receipt, and supplier billing."
     >
-      <DocumentListPage doctype="Purchase Receipt" />
+      <BuyingDashboard />
     </AppShell>
   );
 }

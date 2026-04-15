@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { StockDashboardPage } from "@/components/stock/stock-dashboard-page";
+import { StockDashboardPage } from "@/modules/stock/components/stock-dashboard-page";
 
 export default function StockPage() {
   return (

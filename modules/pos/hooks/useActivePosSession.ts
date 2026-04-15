@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 
 import { useGetActivePosSessionQuery } from "@/modules/pos/api/posApi";
-import { useAppSelector } from "@/store/hooks";
+import { useAppSelector } from "@/core/store/hooks";
 
 export const useActivePosSession = () => {
   const me = useAppSelector((state) => state.auth.me);
@@ -22,3 +22,4 @@ export const useActivePosSession = () => {
     refetch: query.refetch
   };
 };
+

@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { WarehouseStockPage } from "@/components/stock/reports/warehouse-stock-page";
+import { WarehouseStockPage } from "@/modules/stock/components/reports/warehouse-stock-page";
 
 export default function WarehouseStockRoute() {
   return (

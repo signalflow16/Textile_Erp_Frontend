@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { WarehouseEditor } from "@/components/stock/warehouses/editor";
+import { WarehouseEditor } from "@/modules/stock/components/warehouses/editor";
 
 export default async function EditWarehousePage({
   params

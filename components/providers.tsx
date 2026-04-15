@@ -6,12 +6,12 @@ import { PropsWithChildren, useEffect } from "react";
 import { ConfigProvider, App as AntdApp, theme } from "antd";
 import { Provider } from "react-redux";
 
-import { configureAuthRuntime } from "@/lib/auth-runtime";
+import { configureAuthRuntime } from "@/core/auth/auth-runtime";
 import { useSessionKeepAlive } from "@/lib/useSessionKeepAlive";
 import { store } from "@/store";
-import { frappeApi } from "@/store/api/frappeApi";
-import { clearAuth } from "@/store/features/auth/authSlice";
-import { setCsrfToken } from "@/store/features/session/sessionSlice";
+import { frappeApi } from "@/core/api/frappeApi";
+import { clearAuth } from "@/core/store/authSlice";
+import { setCsrfToken } from "@/core/store/sessionSlice";
 
 function AuthRuntimeBridge() {
   useSessionKeepAlive();

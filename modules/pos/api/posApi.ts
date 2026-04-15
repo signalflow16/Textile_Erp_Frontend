@@ -1,4 +1,4 @@
-import { frappeApi } from "@/store/api/frappeApi";
+import { frappeApi } from "@/core/api/frappeApi";
 import type { FrappeApiError, FrappeDocResponse, FrappeListResponse } from "@/modules/buying/types/frappe";
 import { submitDoc } from "@/modules/buying/api/documentActions";
 import type {

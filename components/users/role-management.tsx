@@ -4,8 +4,8 @@ import { useMemo, useState } from "react";
 import { Alert, App, Button, Card, Form, Input, Modal, Space, Table, Tag, Typography } from "antd";
 
 import { extractApiErrorMessage, extractEnvelopeMessage } from "@/lib/api-errors";
-import { useCreateRoleMutation, useGetRolesMasterQuery } from "@/store/api/frappeApi";
-import type { RoleMasterItem } from "@/types/auth";
+import { useCreateRoleMutation, useGetRolesMasterQuery } from "@/core/api/frappeApi";
+import type { RoleMasterItem } from "@/core/auth/types";
 
 const { Text } = Typography;
 

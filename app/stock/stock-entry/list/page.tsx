@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { StockEntryListPage } from "@/components/stock/stock-entry-list-page";
+import { StockEntryListPage } from "@/modules/stock/components/stock-entry-list-page";
 
 export default function StockEntryListRoute() {
   return (

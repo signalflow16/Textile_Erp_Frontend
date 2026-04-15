@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { ItemGroupEditor } from "@/components/stock/item-groups/editor";
+import { ItemGroupEditor } from "@/modules/stock/components/item-groups/editor";
 
 export default async function CreateItemGroupPage({
   searchParams

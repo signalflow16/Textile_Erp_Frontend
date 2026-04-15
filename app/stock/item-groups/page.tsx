@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { ItemGroupWorkspace } from "@/components/stock/item-groups/workspace";
+import { ItemGroupWorkspace } from "@/modules/stock/components/item-groups/workspace";
 
 export default async function ItemGroupsPage({
   searchParams

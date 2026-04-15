@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import { Alert, App, Button, Card, Form, Input, Modal, Select, Space, Switch, Table, Tag, Typography } from "antd";
 
 import { extractApiErrorMessage, extractEnvelopeMessage } from "@/lib/api-errors";
-import { useCreateUserAccountMutation, useGetRoleOptionsQuery, useListUsersQuery } from "@/store/api/frappeApi";
-import { useAppSelector } from "@/store/hooks";
-import type { UserAccount } from "@/types/auth";
+import { useCreateUserAccountMutation, useGetRoleOptionsQuery, useListUsersQuery } from "@/core/api/frappeApi";
+import { useAppSelector } from "@/core/store/hooks";
+import type { UserAccount } from "@/core/auth/types";
 
 const { Text } = Typography;
 
@@ -330,3 +330,4 @@ export function UserManagement() {
     </div>
   );
 }
+

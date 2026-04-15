@@ -9,18 +9,36 @@ import {
   AppstoreOutlined,
   CaretRightFilled,
   DatabaseOutlined,
+  DownOutlined,
   LogoutOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  RightOutlined,
   ShoppingCartOutlined,
   TeamOutlined
 } from "@ant-design/icons";
-import { frappeApi, useLogoutUserMutation } from "@/store/api/frappeApi";
-import { clearAuth } from "@/store/features/auth/authSlice";
-import { setCsrfToken } from "@/store/features/session/sessionSlice";
-import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { frappeApi, useLogoutUserMutation } from "@/core/api/frappeApi";
+import { clearAuth } from "@/core/store/authSlice";
+import { setCsrfToken } from "@/core/store/sessionSlice";
+import { useAppDispatch, useAppSelector } from "@/core/store/hooks";
 
 const { Text, Title } = Typography;
+
+type AppShellNavLink = {
+  key: string;
+  label: string;
+  href: string;
+  matchPrefixes?: string[];
+};
+
+type AppShellModule = {
+  key: string;
+  label: string;
+  icon: React.ReactNode;
+  href: string;
+  matchPrefixes?: string[];
+  links: AppShellNavLink[];
+};
 
 export function AppShell({
   section = "Stock",
@@ -44,6 +62,8 @@ export function AppShell({
   const [logoutUser, logoutState] = useLogoutUserMutation();
   const [collapsed, setCollapsed] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const isPathActive = (candidatePath: string, matchPrefixes: string[] = []) =>
+    [candidatePath, ...matchPrefixes].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
   const breadcrumbItems = breadcrumb
     ?.split(">")
     .map((item) => item.trim())
@@ -51,16 +71,17 @@ export function AppShell({
     .map((item) => ({ title: item }));
   const userName = me?.full_name || me?.first_name || me?.email || me?.user_id || "User";
   const userInitial = userName.charAt(0).toUpperCase();
-  const modules = useMemo(
+  const modules = useMemo<AppShellModule[]>(
     () => [
       {
         key: "stock",
         label: "Stock",
         icon: <DatabaseOutlined />,
         href: "/stock",
+        matchPrefixes: ["/stock"],
         links: [
           { key: "stock-dashboard", label: "Dashboard", href: "/stock" },
-          { key: "stock-items-list", label: "Items", href: "/stock/items" },
+          { key: "stock-items-list", label: "Items", href: "/stock/items", matchPrefixes: ["/stock/items/new"] },
           { key: "stock-item-groups", label: "Item Groups", href: "/stock/item-groups" },
           { key: "stock-warehouses", label: "Warehouses", href: "/stock/warehouses" },
           { key: "stock-parties", label: "Parties", href: "/stock/parties" },
@@ -77,24 +98,59 @@ export function AppShell({
         label: "Buying",
         icon: <ShoppingCartOutlined />,
         href: "/buying",
-        links: [{ key: "buying-purchase-receipts", label: "Purchase Receipts", href: "/buying" }]
+        matchPrefixes: ["/buying"],
+        links: [
+          { key: "buying-dashboard", label: "Dashboard", href: "/buying" },
+          { key: "buying-material-requests", label: "Material Requests", href: "/buying/material-requests" },
+          { key: "buying-rfqs", label: "RFQs", href: "/buying/rfqs" },
+          { key: "buying-supplier-quotations", label: "Supplier Quotations", href: "/buying/supplier-quotations" },
+          { key: "buying-purchase-orders", label: "Purchase Orders", href: "/buying/purchase-orders" },
+          { key: "buying-purchase-receipts", label: "Purchase Receipts", href: "/buying/purchase-receipts" },
+          { key: "buying-purchase-invoices", label: "Purchase Invoices", href: "/buying/purchase-invoices" }
+        ]
       },
       {
         key: "selling",
         label: "Selling",
         icon: <AppstoreOutlined />,
         href: "/selling",
-        links: [{ key: "selling-sales-invoices", label: "Sales Invoices", href: "/selling" }]
+        matchPrefixes: ["/selling"],
+        links: [{ key: "selling-sales-invoices", label: "Sales Invoices", href: "/selling", matchPrefixes: ["/selling/sales-invoices"] }]
+      },
+      {
+        key: "pos",
+        label: "POS",
+        icon: <AppstoreOutlined />,
+        href: "/pos",
+        matchPrefixes: ["/pos"],
+        links: [
+          { key: "pos-billing", label: "Billing", href: "/pos" },
+          { key: "pos-opening", label: "Opening Entry", href: "/pos/opening" },
+          { key: "pos-closing", label: "Closing Entry", href: "/pos/closing" }
+        ]
       },
       {
         key: "admin",
         label: "Admin",
         icon: <TeamOutlined />,
         href: "/users",
+        matchPrefixes: ["/users"],
         links: [{ key: "admin-users", label: "Users", href: "/users" }]
       }
     ],
     []
+  );
+  const selectedLink =
+    modules.flatMap((module) => module.links.map((link) => ({ moduleKey: module.key, link }))).find(({ link }) =>
+      isPathActive(link.href, link.matchPrefixes)
+    ) ?? null;
+  const selectedPageKey = selectedLink?.link.key ?? "stock-dashboard";
+  const selectedModuleKey =
+    selectedLink?.moduleKey ??
+    modules.find((module) => isPathActive(module.href, module.matchPrefixes))?.key ??
+    "stock";
+  const [expandedModules, setExpandedModules] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(modules.map((module) => [module.key, module.key === selectedModuleKey]))
   );
 
   useEffect(() => {
@@ -110,63 +166,12 @@ export function AppShell({
     mediaQuery.addEventListener("change", listener);
     return () => mediaQuery.removeEventListener("change", listener);
   }, []);
-
-  const selectedPageKey = (() => {
-    if (pathname.startsWith("/users")) {
-      return "admin-users";
-    }
-
-    if (pathname.startsWith("/buying")) {
-      return "buying-purchase-receipts";
-    }
-
-    if (pathname.startsWith("/selling")) {
-      return "selling-sales-invoices";
-    }
-
-    if (pathname.startsWith("/stock/item-groups")) {
-      return "stock-item-groups";
-    }
-
-    if (pathname.startsWith("/stock/balance")) {
-      return "stock-balance";
-    }
-
-    if (pathname.startsWith("/stock/ledger")) {
-      return "stock-ledger";
-    }
-
-    if (pathname.startsWith("/stock/warehouse-stock")) {
-      return "stock-warehouse-stock";
-    }
-
-    if (pathname.startsWith("/stock/item-shortage")) {
-      return "stock-item-shortage";
-    }
-
-    if (pathname.startsWith("/stock/stock-entry/create")) {
-      return "stock-entry-create";
-    }
-
-    if (pathname.startsWith("/stock/stock-entry/list")) {
-      return "stock-entry-list";
-    }
-
-    if (pathname.startsWith("/stock/warehouses")) {
-      return "stock-warehouses";
-    }
-
-    if (pathname.startsWith("/stock/parties")) {
-      return "stock-parties";
-    }
-
-    if (pathname === "/stock") {
-      return "stock-dashboard";
-    }
-
-    return "stock-items-list";
-  })();
-  const selectedModuleKey = modules.find((module) => module.links.some((link) => link.key === selectedPageKey))?.key ?? "stock";
+  useEffect(() => {
+    setExpandedModules((current) => ({
+      ...current,
+      [selectedModuleKey]: true
+    }));
+  }, [selectedModuleKey]);
 
   const handleLogout = async () => {
     try {
@@ -184,6 +189,12 @@ export function AppShell({
     if (isMobile) {
       setCollapsed(true);
     }
+  };
+  const toggleModule = (moduleKey: string) => {
+    setExpandedModules((current) => ({
+      ...current,
+      [moduleKey]: !current[moduleKey]
+    }));
   };
 
   const navigationMenu = (
@@ -222,22 +233,33 @@ export function AppShell({
                 key={module.key}
                 className={`sidebar-module ${selectedModuleKey === module.key ? "is-active" : ""}`}
               >
-                <Link href={module.href} className="sidebar-module-header" onClick={handleNavLinkClick}>
-                  <span className="sidebar-module-icon">{module.icon}</span>
-                  <span className="sidebar-module-title">{module.label}</span>
-                </Link>
-                <div className="sidebar-module-links">
-                  {module.links.map((link) => (
-                    <Link
-                      key={link.key}
-                      href={link.href}
-                      className={`sidebar-module-link ${selectedPageKey === link.key ? "is-active" : ""}`}
-                      onClick={handleNavLinkClick}
-                    >
-                      {link.label}
-                    </Link>
-                  ))}
+                <div className="sidebar-module-header-row">
+                  <Link href={module.href} className="sidebar-module-header" onClick={handleNavLinkClick}>
+                    <span className="sidebar-module-icon">{module.icon}</span>
+                    <span className="sidebar-module-title">{module.label}</span>
+                  </Link>
+                  <Button
+                    type="text"
+                    className="sidebar-module-toggle"
+                    icon={expandedModules[module.key] ? <DownOutlined /> : <RightOutlined />}
+                    onClick={() => toggleModule(module.key)}
+                    aria-label={`${expandedModules[module.key] ? "Collapse" : "Expand"} ${module.label}`}
+                  />
                 </div>
+                {expandedModules[module.key] ? (
+                  <div className="sidebar-module-links">
+                    {module.links.map((link) => (
+                      <Link
+                        key={link.key}
+                        href={link.href}
+                        className={`sidebar-module-link ${selectedPageKey === link.key ? "is-active" : ""}`}
+                        onClick={handleNavLinkClick}
+                      >
+                        {link.label}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
               </section>
             ))}
           </div>
@@ -311,3 +333,4 @@ export function AppShell({
     </div>
   );
 }
+

@@ -2,7 +2,7 @@
 
 import { Alert, Form, Input, InputNumber, Select } from "antd";
 
-import type { ItemCreateValues, ItemFieldAvailability, ItemFormLookups } from "@/types/master-data";
+import type { ItemCreateValues, ItemFieldAvailability, ItemFormLookups } from "@/modules/stock/types/master-data";
 
 export function ItemCreateForm({
   form,

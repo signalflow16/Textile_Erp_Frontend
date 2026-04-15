@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { WarehouseWorkspace } from "@/components/stock/warehouses/workspace";
+import { WarehouseWorkspace } from "@/modules/stock/components/warehouses/workspace";
 
 export default async function StockWarehousesRoute({
   searchParams

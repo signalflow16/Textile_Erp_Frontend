@@ -1,5 +1,5 @@
 import { AppShell } from "@/components/app-shell";
-import { StockLedgerPage } from "@/components/stock/reports/stock-ledger-page";
+import { StockLedgerPage } from "@/modules/stock/components/reports/stock-ledger-page";
 
 export default function StockLedgerRoute() {
   return (
