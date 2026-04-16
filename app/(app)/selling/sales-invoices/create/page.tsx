@@ -1,15 +1,25 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { DocumentEditorPage } from "@/modules/shared/document/components/document-editor-page";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function SalesInvoiceCreateRoute() {
-  return (
-    <AppShell
-      section="Selling"
-      title="New Sales Invoice"
-      breadcrumb="Selling > Sales Invoices > Create"
-      subtitle="Create sales invoices with pricing defaults and live stock checks."
-    >
-      <DocumentEditorPage doctype="Sales Invoice" name="__draft__sales-invoice" />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "New Sales Invoice",
+      subtitle: "Create sales invoices with pricing defaults and live stock checks."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <DocumentEditorPage doctype="Sales Invoice" name="__draft__sales-invoice" />;
 }

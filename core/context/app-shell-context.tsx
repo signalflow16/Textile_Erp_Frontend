@@ -1,10 +1,9 @@
 "use client";
 
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useState } from "react";
 
 export type AppShellConfig = {
   title?: string;
-  breadcrumb?: string;
   subtitle?: string;
 };
 
@@ -18,24 +17,22 @@ const AppShellContext = createContext<AppShellContextValue | null>(null);
 
 const defaultConfig: AppShellConfig = {
   title: "",
-  breadcrumb: "",
   subtitle: ""
 };
 
 export function AppShellProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfigState] = useState<AppShellConfig>(defaultConfig);
 
-  const setConfig = (next: AppShellConfig) => {
+  const setConfig = useCallback((next: AppShellConfig) => {
     setConfigState({
       title: next.title ?? "",
-      breadcrumb: next.breadcrumb ?? "",
       subtitle: next.subtitle ?? ""
     });
-  };
+  }, []);
 
-  const resetConfig = () => {
+  const resetConfig = useCallback(() => {
     setConfigState(defaultConfig);
-  };
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -43,7 +40,7 @@ export function AppShellProvider({ children }: { children: React.ReactNode }) {
       setConfig,
       resetConfig
     }),
-    [config]
+    [config, resetConfig, setConfig]
   );
 
   return <AppShellContext.Provider value={value}>{children}</AppShellContext.Provider>;

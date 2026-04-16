@@ -1,15 +1,29 @@
-import { AppShell } from "@/components/app-shell";
-import { PurchaseReceiptForm } from "@/modules/buying/components/PurchaseReceiptForm";
+"use client";
 
-export default async function NewPurchaseReceiptPage({
-  searchParams
-}: {
-  searchParams: Promise<{ source_doctype?: string; source_name?: string }>;
-}) {
-  const params = await searchParams;
-  return (
-    <AppShell section="Buying" title="Create Purchase Receipt" breadcrumb="Buying > Purchase Receipts > New" subtitle="Capture received quantities and warehouse stock-in.">
-      <PurchaseReceiptForm sourceDoctype={params.source_doctype} sourceName={params.source_name} />
-    </AppShell>
-  );
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { PurchaseReceiptForm } from "@/modules/buying/components/PurchaseReceiptForm";
+import { useAppShell } from "@/core/context/app-shell-context";
+
+export default function NewPurchaseReceiptPage() {
+  const { setConfig } = useAppShell();
+  const searchParams = useSearchParams();
+  const sourceDoctype = searchParams.get("source_doctype") ?? undefined;
+  const sourceName = searchParams.get("source_name") ?? undefined;
+
+  useEffect(() => {
+    setConfig({
+      title: "Create Purchase Receipt",
+      subtitle: "Capture received quantities and warehouse stock-in."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <PurchaseReceiptForm sourceDoctype={sourceDoctype} sourceName={sourceName} />;
 }

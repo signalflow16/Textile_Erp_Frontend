@@ -1,27 +1,31 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { RfqDetail } from "@/modules/buying/components/RfqDetail";
 import { RfqForm } from "@/modules/buying/components/RfqForm";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function RfqDetailPage({
-  params,
-  searchParams
-}: {
-  params: Promise<{ name: string }>;
-  searchParams: Promise<{ edit?: string }>;
-}) {
-  const { name } = await params;
-  const query = await searchParams;
-  const decoded = decodeURIComponent(name);
-  const editMode = query.edit === "1";
+export default function RfqDetailPage() {
+  const { setConfig } = useAppShell();
+  const params = useParams<{ name: string }>();
+  const searchParams = useSearchParams();
+  const decoded = decodeURIComponent(params.name);
+  const editMode = searchParams.get("edit") === "1";
 
-  return (
-    <AppShell
-      section="Buying"
-      title={editMode ? `Edit RFQ ${decoded}` : `RFQ ${decoded}`}
-      breadcrumb={`Buying > RFQs > ${decoded}`}
-      subtitle="RFQ is optional and used for supplier comparison."
-    >
-      {editMode ? <RfqForm name={decoded} /> : <RfqDetail name={decoded} />}
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: editMode ? `Edit RFQ ${decoded}` : `RFQ ${decoded}`,
+      subtitle: "RFQ is optional and used for supplier comparison."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [decoded, editMode, setConfig]);
+
+  return editMode ? <RfqForm name={decoded} /> : <RfqDetail name={decoded} />;
 }

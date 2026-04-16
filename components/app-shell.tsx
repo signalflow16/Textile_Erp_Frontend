@@ -18,9 +18,11 @@ import {
   TeamOutlined
 } from "@ant-design/icons";
 import { frappeApi, useLogoutUserMutation } from "@/core/api/frappeApi";
+import { generateBreadcrumb } from "@/core/utils/breadcrumb";
 import { clearAuth } from "@/core/store/authSlice";
 import { setCsrfToken } from "@/core/store/sessionSlice";
 import { useAppDispatch, useAppSelector } from "@/core/store/hooks";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 const { Text, Title } = Typography;
 
@@ -42,21 +44,17 @@ type AppShellModule = {
 
 export function AppShell({
   section = "Stock",
-  title,
-  breadcrumb,
-  subtitle,
-  actions,
   children
 }: {
   section?: string;
-  title: string;
-  breadcrumb?: string;
-  subtitle?: string;
-  actions?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const router = useRouter();
+  const { config } = useAppShell();
+  const title = config.title || "Dashboard";
+  const subtitle = config.subtitle;
   const pathname = usePathname();
+  const autoBreadcrumb = generateBreadcrumb(pathname) || "Dashboard";
   const dispatch = useAppDispatch();
   const me = useAppSelector((state) => state.auth.me);
   const [logoutUser, logoutState] = useLogoutUserMutation();
@@ -64,8 +62,8 @@ export function AppShell({
   const [isMobile, setIsMobile] = useState(false);
   const isPathActive = (candidatePath: string, matchPrefixes: string[] = []) =>
     [candidatePath, ...matchPrefixes].some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
-  const breadcrumbItems = breadcrumb
-    ?.split(">")
+  const breadcrumbItems = autoBreadcrumb
+    .split(">")
     .map((item) => item.trim())
     .filter(Boolean)
     .map((item) => ({ title: item }));
@@ -292,7 +290,6 @@ export function AppShell({
             {!collapsed && subtitle ? <div className="header-subtitle">{subtitle}</div> : null}
           </div>
           <div className="app-header-actions">
-            {actions}
             <div className="app-header-profile">
               <Avatar size={32} className="app-header-avatar">
                 {userInitial}
@@ -333,4 +330,3 @@ export function AppShell({
     </div>
   );
 }
-

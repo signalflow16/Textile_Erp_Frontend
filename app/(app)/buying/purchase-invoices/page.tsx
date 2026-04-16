@@ -1,10 +1,25 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { PurchaseInvoiceList } from "@/modules/buying/components/PurchaseInvoiceList";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function PurchaseInvoicesPage() {
-  return (
-    <AppShell section="Buying" title="Purchase Invoices" breadcrumb="Buying > Purchase Invoices" subtitle="Track supplier bills and payable liabilities.">
-      <PurchaseInvoiceList />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "Purchase Invoices",
+      subtitle: "Track supplier bills and payable liabilities."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <PurchaseInvoiceList />;
 }

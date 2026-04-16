@@ -1,27 +1,31 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { PurchaseOrderDetail } from "@/modules/buying/components/PurchaseOrderDetail";
 import { PurchaseOrderForm } from "@/modules/buying/components/PurchaseOrderForm";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function PurchaseOrderDetailPage({
-  params,
-  searchParams
-}: {
-  params: Promise<{ name: string }>;
-  searchParams: Promise<{ edit?: string }>;
-}) {
-  const { name } = await params;
-  const query = await searchParams;
-  const decoded = decodeURIComponent(name);
-  const editMode = query.edit === "1";
+export default function PurchaseOrderDetailPage() {
+  const { setConfig } = useAppShell();
+  const params = useParams<{ name: string }>();
+  const searchParams = useSearchParams();
+  const decoded = decodeURIComponent(params.name);
+  const editMode = searchParams.get("edit") === "1";
 
-  return (
-    <AppShell
-      section="Buying"
-      title={editMode ? `Edit Purchase Order ${decoded}` : `Purchase Order ${decoded}`}
-      breadcrumb={`Buying > Purchase Orders > ${decoded}`}
-      subtitle="Purchase Order confirms buying commitment."
-    >
-      {editMode ? <PurchaseOrderForm name={decoded} /> : <PurchaseOrderDetail name={decoded} />}
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: editMode ? `Edit Purchase Order ${decoded}` : `Purchase Order ${decoded}`,
+      subtitle: "Purchase Order confirms buying commitment."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [decoded, editMode, setConfig]);
+
+  return editMode ? <PurchaseOrderForm name={decoded} /> : <PurchaseOrderDetail name={decoded} />;
 }

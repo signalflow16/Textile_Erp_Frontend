@@ -1,15 +1,25 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { PosClosingEntryPage } from "@/modules/pos/components/PosClosingEntryPage";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function PosClosingPage() {
-  return (
-    <AppShell
-      section="Sales"
-      title="POS Closing Entry"
-      breadcrumb="Sales > POS Closing Entry"
-      subtitle="End POS session and verify collected amount."
-    >
-      <PosClosingEntryPage />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "POS Closing Entry",
+      subtitle: "End POS session and verify collected amount."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <PosClosingEntryPage />;
 }

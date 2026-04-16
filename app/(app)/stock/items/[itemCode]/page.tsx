@@ -1,20 +1,28 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useParams } from "next/navigation";
 import { StoreHydratedItemPage } from "@/modules/stock/components/store-hydrated-item-page";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function EditItemPage({
-  params
-}: {
-  params: Promise<{ itemCode: string }>;
-}) {
-  const { itemCode } = await params;
+export default function EditItemPage() {
+  const { setConfig } = useAppShell();
+  const params = useParams<{ itemCode: string }>();
+  const itemCode = decodeURIComponent(params.itemCode);
 
-  return (
-    <AppShell
-      title={`Edit Item ${decodeURIComponent(itemCode)}`}
-      breadcrumb={`Stock > Item > ${decodeURIComponent(itemCode)}`}
-      subtitle="Update item master values, textile attributes, and barcode records."
-    >
-      <StoreHydratedItemPage itemCode={decodeURIComponent(itemCode)} />
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: `Edit Item ${itemCode}`,
+      subtitle: "Update item master values, textile attributes, and barcode records."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [itemCode, setConfig]);
+
+  return <StoreHydratedItemPage itemCode={itemCode} />;
 }

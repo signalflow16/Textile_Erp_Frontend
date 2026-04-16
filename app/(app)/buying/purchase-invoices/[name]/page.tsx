@@ -1,27 +1,31 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import { PurchaseInvoiceDetail } from "@/modules/buying/components/PurchaseInvoiceDetail";
 import { PurchaseInvoiceForm } from "@/modules/buying/components/PurchaseInvoiceForm";
+import { useAppShell } from "@/core/context/app-shell-context";
 
-export default async function PurchaseInvoiceDetailPage({
-  params,
-  searchParams
-}: {
-  params: Promise<{ name: string }>;
-  searchParams: Promise<{ edit?: string }>;
-}) {
-  const { name } = await params;
-  const query = await searchParams;
-  const decoded = decodeURIComponent(name);
-  const editMode = query.edit === "1";
+export default function PurchaseInvoiceDetailPage() {
+  const { setConfig } = useAppShell();
+  const params = useParams<{ name: string }>();
+  const searchParams = useSearchParams();
+  const decoded = decodeURIComponent(params.name);
+  const editMode = searchParams.get("edit") === "1";
 
-  return (
-    <AppShell
-      section="Buying"
-      title={editMode ? `Edit Purchase Invoice ${decoded}` : `Purchase Invoice ${decoded}`}
-      breadcrumb={`Buying > Purchase Invoices > ${decoded}`}
-      subtitle="Purchase Invoice affects supplier liability and finance books."
-    >
-      {editMode ? <PurchaseInvoiceForm name={decoded} /> : <PurchaseInvoiceDetail name={decoded} />}
-    </AppShell>
-  );
+  useEffect(() => {
+    setConfig({
+      title: editMode ? `Edit Purchase Invoice ${decoded}` : `Purchase Invoice ${decoded}`,
+      subtitle: "Purchase Invoice affects supplier liability and finance books."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [decoded, editMode, setConfig]);
+
+  return editMode ? <PurchaseInvoiceForm name={decoded} /> : <PurchaseInvoiceDetail name={decoded} />;
 }

@@ -1,10 +1,25 @@
-import { AppShell } from "@/components/app-shell";
+"use client";
+
+import { useEffect } from "react";
 import { RfqList } from "@/modules/buying/components/RfqList";
+import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function RfqsPage() {
-  return (
-    <AppShell section="Buying" title="Request for Quotations" breadcrumb="Buying > RFQs" subtitle="Collect supplier quotations for demand items.">
-      <RfqList />
-    </AppShell>
-  );
+  const { setConfig } = useAppShell();
+
+  useEffect(() => {
+    setConfig({
+      title: "Request for Quotations",
+      subtitle: "Collect supplier quotations for demand items."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <RfqList />;
 }

@@ -1,15 +1,29 @@
-import { AppShell } from "@/components/app-shell";
-import { SupplierQuotationForm } from "@/modules/buying/components/SupplierQuotationForm";
+"use client";
 
-export default async function NewSupplierQuotationPage({
-  searchParams
-}: {
-  searchParams: Promise<{ source_doctype?: string; source_name?: string }>;
-}) {
-  const params = await searchParams;
-  return (
-    <AppShell section="Buying" title="Create Supplier Quotation" breadcrumb="Buying > Supplier Quotations > New" subtitle="Record supplier quotation details for decision making.">
-      <SupplierQuotationForm sourceDoctype={params.source_doctype} sourceName={params.source_name} />
-    </AppShell>
-  );
+import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { SupplierQuotationForm } from "@/modules/buying/components/SupplierQuotationForm";
+import { useAppShell } from "@/core/context/app-shell-context";
+
+export default function NewSupplierQuotationPage() {
+  const { setConfig } = useAppShell();
+  const searchParams = useSearchParams();
+  const sourceDoctype = searchParams.get("source_doctype") ?? undefined;
+  const sourceName = searchParams.get("source_name") ?? undefined;
+
+  useEffect(() => {
+    setConfig({
+      title: "Create Supplier Quotation",
+      subtitle: "Record supplier quotation details for decision making."
+    });
+
+    return () => {
+      setConfig({
+        title: "",
+        subtitle: ""
+      });
+    };
+  }, [setConfig]);
+
+  return <SupplierQuotationForm sourceDoctype={sourceDoctype} sourceName={sourceName} />;
 }
