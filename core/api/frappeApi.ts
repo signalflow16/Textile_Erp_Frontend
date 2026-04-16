@@ -37,7 +37,8 @@ import type {
   ItemPriceListParams,
   ItemPriceListResponse,
   ItemPriceSummary,
-  ItemVariantAttributeLookups
+  ItemVariantAttributeLookups,
+  WarehouseLookupOption
 } from "@/modules/stock/types/item";
 import { setCsrfToken } from "@/core/store/sessionSlice";
 import type { RootState } from "@/store";
@@ -998,7 +999,7 @@ export const frappeApi = createApi({
     getItemLookups: builder.query<ItemMasterLookups, void>({
       async queryFn(_arg, _api, _extra, baseQuery) {
         const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
-        const [itemGroupsResult, uomsResult, brandsResult] = await Promise.all([
+        const [itemGroupsResult, uomsResult, brandsResult, warehousesResult] = await Promise.all([
           run({
             url: "/resource/Item Group",
             method: "GET",
@@ -1025,6 +1026,15 @@ export const frappeApi = createApi({
               order_by: "name asc",
               limit_page_length: 500
             }
+          }),
+          run({
+            url: "/resource/Warehouse",
+            method: "GET",
+            params: {
+              fields: encodeFrappeJson(["name", "is_group"]),
+              order_by: "name asc",
+              limit_page_length: 500
+            }
           })
         ]);
 
@@ -1040,6 +1050,10 @@ export const frappeApi = createApi({
           return { error: toBaseQueryError(brandsResult.error) };
         }
 
+        if (hasQueryError(warehousesResult)) {
+          return { error: toBaseQueryError(warehousesResult.error) };
+        }
+
         const item_groups = (itemGroupsResult.data as FrappeListResponse<{ name: string }>).data.map((entry) => ({
           label: entry.name,
           value: entry.name
@@ -1052,13 +1066,20 @@ export const frappeApi = createApi({
           label: entry.name,
           value: entry.name
         }));
+        const warehouses: WarehouseLookupOption[] = (
+          warehousesResult.data as FrappeListResponse<{ name: string; is_group?: 0 | 1 | boolean | null }>
+        ).data.map((entry) => ({
+          label: entry.name,
+          value: entry.name,
+          is_group: toBitFlag(entry.is_group)
+        }));
 
         return {
           data: {
             item_groups,
             uoms,
             brands,
-            warehouses: [],
+            warehouses,
             quality_templates: [],
             tax_templates: [],
             price_lists: [],
@@ -1072,6 +1093,39 @@ export const frappeApi = createApi({
         };
       },
       providesTags: ["Lookups"]
+    }),
+    getItemCodeAvailability: builder.query<{ exists: boolean }, { itemCode: string; currentItemCode?: string }>({
+      async queryFn({ itemCode, currentItemCode }, _api, _extra, baseQuery) {
+        const normalizedItemCode = itemCode.trim();
+        if (!normalizedItemCode) {
+          return { data: { exists: false } };
+        }
+
+        if (currentItemCode && normalizedItemCode === currentItemCode.trim()) {
+          return { data: { exists: false } };
+        }
+
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+        const result = await run({
+          url: "/resource/Item",
+          method: "GET",
+          params: {
+            fields: encodeFrappeJson(["name"]),
+            filters: encodeFrappeJson([["item_code", "=", normalizedItemCode]]),
+            limit_page_length: 1
+          }
+        });
+
+        if (hasQueryError(result)) {
+          return { error: toBaseQueryError(result.error) };
+        }
+
+        return {
+          data: {
+            exists: ((result.data as FrappeListResponse<{ name: string }>).data?.length ?? 0) > 0
+          }
+        };
+      }
     }),
     getItemGroupLookups: builder.query<ItemGroupLookups, ItemGroupLookupsParams | void>({
       async queryFn(params, _api, _extra, baseQuery) {
@@ -1465,6 +1519,7 @@ export const {
   useGetItemGroupLookupsQuery,
   useGetItemGroupQuery,
   useGetItemGroupTreeQuery,
+  useGetItemCodeAvailabilityQuery,
   useGetItemListQuery,
   useGetItemLookupsQuery,
   useGetItemPriceListQuery,

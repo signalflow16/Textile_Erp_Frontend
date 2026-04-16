@@ -34,6 +34,7 @@ type WarehouseState = EntityState<WarehouseRow, string> & {
   lookupStatus: MasterDataRequestState;
   error: string | null;
   lookups: LookupState;
+  stockChecks: Record<string, { hasStock: boolean; loading: boolean }>;
 };
 
 const warehouseAdapter = createEntityAdapter<WarehouseRow, string>({
@@ -51,7 +52,8 @@ const initialState: WarehouseState = warehouseAdapter.getInitialState({
   error: null,
   lookups: {
     companies: []
-  }
+  },
+  stockChecks: {}
 });
 
 const encodeFrappeJson = (value: unknown) => JSON.stringify(value);
@@ -199,6 +201,34 @@ export const deleteWarehouse = createAsyncThunk<string, string, { rejectValue: s
   }
 );
 
+export const fetchWarehouseDeleteGuard = createAsyncThunk<
+  { warehouse: string; hasStock: boolean },
+  string,
+  { rejectValue: string }
+>(
+  "warehouses/fetchWarehouseDeleteGuard",
+  async (warehouseName, thunkApi) => {
+    try {
+      const response = await apiRequest<FrappeListPayload<{ name: string; actual_qty?: number | string | null }>>({
+        url: masterDataEndpoints.stock.bin,
+        method: "GET",
+        params: {
+          fields: encodeFrappeJson(["name", "actual_qty"]),
+          filters: encodeFrappeJson([["warehouse", "=", warehouseName], ["actual_qty", "!=", 0]]),
+          limit_page_length: 1
+        }
+      });
+
+      return {
+        warehouse: warehouseName,
+        hasStock: (response.data?.length ?? 0) > 0
+      };
+    } catch (error) {
+      return thunkApi.rejectWithValue(normalizeApiError(error, "Unable to validate warehouse stock.").message);
+    }
+  }
+);
+
 const warehouseSlice = createSlice({
   name: "warehouses",
   initialState,
@@ -287,6 +317,25 @@ const warehouseSlice = createSlice({
       .addCase(deleteWarehouse.rejected, (state, action) => {
         state.updateStatus = "failed";
         state.error = action.payload ?? "Unable to delete warehouse.";
+      })
+      .addCase(fetchWarehouseDeleteGuard.pending, (state, action) => {
+        state.stockChecks[action.meta.arg] = {
+          hasStock: state.stockChecks[action.meta.arg]?.hasStock ?? false,
+          loading: true
+        };
+      })
+      .addCase(fetchWarehouseDeleteGuard.fulfilled, (state, action) => {
+        state.stockChecks[action.payload.warehouse] = {
+          hasStock: action.payload.hasStock,
+          loading: false
+        };
+      })
+      .addCase(fetchWarehouseDeleteGuard.rejected, (state, action) => {
+        state.stockChecks[action.meta.arg] = {
+          hasStock: true,
+          loading: false
+        };
+        state.error = action.payload ?? "Unable to validate warehouse stock.";
       });
   }
 });
@@ -299,6 +348,7 @@ export const selectAllWarehouses = adapterSelectors.selectAll;
 export const selectWarehouseState = (state: RootState) => state.warehouses;
 export const selectWarehouseCompanies = (state: RootState) => state.warehouses.lookups.companies;
 export const selectSelectedWarehouseId = (state: RootState) => state.warehouses.selectedWarehouse;
+export const selectWarehouseDeleteCheck = (state: RootState, warehouse: string) => state.warehouses.stockChecks[warehouse];
 export const selectSelectedWarehouse = createSelector(
   [adapterSelectors.selectEntities, selectSelectedWarehouseId],
   (entities, selectedWarehouseId) => (selectedWarehouseId ? entities[selectedWarehouseId] : undefined)

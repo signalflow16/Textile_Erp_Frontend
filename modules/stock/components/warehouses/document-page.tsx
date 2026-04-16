@@ -45,7 +45,7 @@ export function WarehouseDocumentPage({
               </Text>
             </div>
             <Space wrap>
-              {mode === "edit" && warehouse && !warehouse.parent_warehouse ? (
+              {mode === "edit" && warehouse && warehouse.is_group ? (
                 <Button
                   icon={<PlusOutlined />}
                   onClick={() => onAddChild(warehouse.name)}
@@ -101,7 +101,7 @@ export function WarehouseDocumentPage({
               </div>
 
               <Text type="secondary" className="item-group-document-help">
-                Only root warehouses can add child warehouses from the tree and document page.
+                Only group warehouses can contain child warehouses. Leaf warehouses stay as transaction endpoints.
               </Text>
             </div>
           </Form>

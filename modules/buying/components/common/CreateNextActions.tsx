@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { Button, Divider, Space, Typography } from "antd";
 
 const { Text } = Typography;
@@ -9,6 +10,8 @@ export function CreateNextActions({
 }: {
   actions?: Array<{ label: string; href: string }>;
 }) {
+  const router = useRouter();
+
   if (!actions?.length) {
     return null;
   }
@@ -20,7 +23,7 @@ export function CreateNextActions({
         <Text type="secondary">Next step</Text>
         <Space wrap>
           {actions.map((action) => (
-            <Button key={action.href} href={action.href}>
+            <Button key={action.href} onClick={() => router.push(action.href)}>
               {action.label}
             </Button>
           ))}

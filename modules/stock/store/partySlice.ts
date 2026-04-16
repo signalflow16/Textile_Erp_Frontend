@@ -34,6 +34,10 @@ type PartyState = {
     suppliers: MasterDataRequestState;
     customers: MasterDataRequestState;
   };
+  deleteStatus: {
+    suppliers: MasterDataRequestState;
+    customers: MasterDataRequestState;
+  };
   lookupsStatus: MasterDataRequestState;
   lookups: PartyLookups;
   error: {
@@ -61,6 +65,10 @@ const initialState: PartyState = {
     customers: "idle"
   },
   createStatus: {
+    suppliers: "idle",
+    customers: "idle"
+  },
+  deleteStatus: {
     suppliers: "idle",
     customers: "idle"
   },
@@ -246,6 +254,32 @@ export const createParty = createAsyncThunk<
   }
 );
 
+export const deleteParty = createAsyncThunk<
+  { type: "supplier"; name: string } | { type: "customer"; name: string },
+  { type: "supplier" | "customer"; name: string },
+  { rejectValue: { type: "supplier" | "customer"; message: string } }
+>(
+  "parties/deleteParty",
+  async (payload, thunkApi) => {
+    try {
+      await apiRequest({
+        url:
+          payload.type === "supplier"
+            ? masterDataEndpoints.supplier.detail(payload.name)
+            : masterDataEndpoints.customer.detail(payload.name),
+        method: "DELETE"
+      });
+
+      return payload;
+    } catch (error) {
+      return thunkApi.rejectWithValue({
+        type: payload.type,
+        message: normalizeApiError(error, `Unable to delete ${payload.type}.`).message
+      });
+    }
+  }
+);
+
 const partySlice = createSlice({
   name: "parties",
   initialState,
@@ -314,6 +348,30 @@ const partySlice = createSlice({
 
         const targetKey = action.payload.type === "supplier" ? "suppliers" : "customers";
         state.createStatus[targetKey] = "failed";
+        state.error[targetKey] = action.payload.message;
+      })
+      .addCase(deleteParty.pending, (state, action) => {
+        const targetKey = action.meta.arg.type === "supplier" ? "suppliers" : "customers";
+        state.deleteStatus[targetKey] = "loading";
+        state.error[targetKey] = null;
+      })
+      .addCase(deleteParty.fulfilled, (state, action) => {
+        if (action.payload.type === "supplier") {
+          state.deleteStatus.suppliers = "succeeded";
+          supplierAdapter.removeOne(state.suppliers, action.payload.name);
+          return;
+        }
+
+        state.deleteStatus.customers = "succeeded";
+        customerAdapter.removeOne(state.customers, action.payload.name);
+      })
+      .addCase(deleteParty.rejected, (state, action) => {
+        if (!action.payload) {
+          return;
+        }
+
+        const targetKey = action.payload.type === "supplier" ? "suppliers" : "customers";
+        state.deleteStatus[targetKey] = "failed";
         state.error[targetKey] = action.payload.message;
       });
   }

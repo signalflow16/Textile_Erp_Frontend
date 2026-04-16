@@ -16,7 +16,8 @@ const toTreeData = ({
   onSelect,
   onEdit,
   onAddChild,
-  onDelete
+  onDelete,
+  getDeleteState
 }: {
   nodes: WarehouseNode[];
   selectedWarehouse?: string;
@@ -24,45 +25,53 @@ const toTreeData = ({
   onEdit: (warehouse: string) => void;
   onAddChild: (warehouse: string) => void;
   onDelete: (warehouse: string) => void;
+  getDeleteState: (warehouse: WarehouseNode) => { loading: boolean; disabledReason?: string };
 }): DataNode[] =>
-  nodes.map((node) => ({
-    key: node.key,
-    title: (
-      <div className={`item-group-tree-row ${selectedWarehouse === node.name ? "selected" : ""}`}>
-        <div className="item-group-tree-row-main" onClick={() => onSelect(node.name)}>
-          <Text strong className="item-group-tree-row-title">
-            {node.title}
-          </Text>
-          <Space size={6} wrap>
-            <Tag bordered={false} className="item-group-tree-chip">
-              {node.parent_warehouse ? (node.is_group ? "Group" : "Leaf") : "Root"}
-            </Tag>
-            {node.company ? <Text type="secondary" className="item-group-tree-meta">{node.company}</Text> : null}
-          </Space>
-        </div>
+  nodes.map((node) => {
+    const deleteState = getDeleteState(node);
 
-        {selectedWarehouse === node.name ? (
-          <div className="item-group-tree-row-actions">
-            <WarehouseActions
-              canAddChild={!node.parent_warehouse}
-              canDelete={Boolean(node.parent_warehouse)}
-              onEdit={() => onEdit(node.name)}
-              onAddChild={() => onAddChild(node.name)}
-              onDelete={() => onDelete(node.name)}
-            />
+    return {
+      key: node.key,
+      title: (
+        <div className={`item-group-tree-row ${selectedWarehouse === node.name ? "selected" : ""}`}>
+          <div className="item-group-tree-row-main" onClick={() => onSelect(node.name)}>
+            <Text strong className="item-group-tree-row-title">
+              {node.title}
+            </Text>
+            <Space size={6} wrap>
+              <Tag bordered={false} className="item-group-tree-chip">
+                {node.parent_warehouse ? (node.is_group ? "Group" : "Leaf") : "Root"}
+              </Tag>
+              {node.company ? <Text type="secondary" className="item-group-tree-meta">{node.company}</Text> : null}
+            </Space>
           </div>
-        ) : null}
-      </div>
-    ),
-    children: toTreeData({
-      nodes: node.children ?? [],
-      selectedWarehouse,
-      onSelect,
-      onEdit,
-      onAddChild,
-      onDelete
-    })
-  }));
+
+          {selectedWarehouse === node.name ? (
+            <div className="item-group-tree-row-actions">
+              <WarehouseActions
+                canAddChild={Boolean(node.is_group)}
+                canDelete={Boolean(node.parent_warehouse)}
+                deleteLoading={deleteState.loading}
+                deleteDisabledReason={deleteState.disabledReason}
+                onEdit={() => onEdit(node.name)}
+                onAddChild={() => onAddChild(node.name)}
+                onDelete={() => onDelete(node.name)}
+              />
+            </div>
+          ) : null}
+        </div>
+      ),
+      children: toTreeData({
+        nodes: node.children ?? [],
+        selectedWarehouse,
+        onSelect,
+        onEdit,
+        onAddChild,
+        onDelete,
+        getDeleteState
+      })
+    };
+  });
 
 export function WarehouseTreePanel({
   nodes,
@@ -79,7 +88,8 @@ export function WarehouseTreePanel({
   onCreate,
   onEdit,
   onAddChild,
-  onDelete
+  onDelete,
+  getDeleteState
 }: {
   nodes: WarehouseNode[];
   loading: boolean;
@@ -96,10 +106,11 @@ export function WarehouseTreePanel({
   onEdit: (warehouse: string) => void;
   onAddChild: (warehouse: string) => void;
   onDelete: (warehouse: string) => void;
+  getDeleteState: (warehouse: WarehouseNode) => { loading: boolean; disabledReason?: string };
 }) {
   const treeData = useMemo(
-    () => toTreeData({ nodes, selectedWarehouse, onSelect, onEdit, onAddChild, onDelete }),
-    [nodes, selectedWarehouse, onSelect, onEdit, onAddChild, onDelete]
+    () => toTreeData({ nodes, selectedWarehouse, onSelect, onEdit, onAddChild, onDelete, getDeleteState }),
+    [nodes, selectedWarehouse, onSelect, onEdit, onAddChild, onDelete, getDeleteState]
   );
 
   const handleSelect: TreeProps["onSelect"] = (keys) => {
@@ -144,7 +155,7 @@ export function WarehouseTreePanel({
         <span className="item-group-summary-inline">
           <FolderOpenOutlined /> {nodes.length} root warehouses
         </span>
-        <span className="item-group-summary-inline">Only root warehouses can add child warehouses</span>
+        <span className="item-group-summary-inline">Only group warehouses can add child warehouses</span>
       </div>
 
       <div className="item-group-tree-simple-card item-group-tree-simple-card-tall">

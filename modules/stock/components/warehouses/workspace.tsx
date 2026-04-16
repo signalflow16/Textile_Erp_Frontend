@@ -32,6 +32,7 @@ export function WarehouseWorkspace({
         onEdit={workspace.goToEdit}
         onAddChild={workspace.goToCreate}
         onDelete={workspace.deleteWarehouse}
+        getDeleteState={workspace.getDeleteState}
       />
     </div>
   );

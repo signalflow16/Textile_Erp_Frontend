@@ -1,11 +1,13 @@
 "use client";
 
 import { DeleteOutlined, EditOutlined, PlusOutlined } from "@ant-design/icons";
-import { Button, Popconfirm, Space } from "antd";
+import { Button, Popconfirm, Space, Tooltip } from "antd";
 
 export function WarehouseActions({
   canAddChild,
   canDelete,
+  deleteDisabledReason,
+  deleteLoading,
   onEdit,
   onAddChild
   ,
@@ -13,10 +15,14 @@ export function WarehouseActions({
 }: {
   canAddChild: boolean;
   canDelete: boolean;
+  deleteDisabledReason?: string;
+  deleteLoading?: boolean;
   onEdit: () => void;
   onAddChild: () => void;
   onDelete: () => void;
 }) {
+  const deleteDisabled = !canDelete || Boolean(deleteDisabledReason) || Boolean(deleteLoading);
+
   return (
     <div onClick={(event) => event.stopPropagation()}>
       <Space size={4} wrap>
@@ -28,18 +34,23 @@ export function WarehouseActions({
             Add Child
           </Button>
         ) : null}
-        <Popconfirm
-          title="Delete warehouse?"
-          description="This action cannot be undone."
-          okText="Delete"
-          cancelText="Cancel"
-          okButtonProps={{ danger: true }}
-          onConfirm={onDelete}
-        >
-          <Button size="small" danger icon={<DeleteOutlined />} disabled={!canDelete}>
-            Delete
-          </Button>
-        </Popconfirm>
+        <Tooltip title={deleteDisabledReason}>
+          <span>
+            <Popconfirm
+              title="Delete warehouse?"
+              description="This action cannot be undone."
+              okText="Delete"
+              cancelText="Cancel"
+              okButtonProps={{ danger: true }}
+              onConfirm={onDelete}
+              disabled={deleteDisabled}
+            >
+              <Button size="small" danger icon={<DeleteOutlined />} disabled={deleteDisabled} loading={deleteLoading}>
+                Delete
+              </Button>
+            </Popconfirm>
+          </span>
+        </Tooltip>
       </Space>
     </div>
   );
