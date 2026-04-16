@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Alert, Button, Card, Input, Select, Space, Table } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
 
 import { DocumentStatusBadge } from "@/modules/buying/components/DocumentStatusBadge";
 import type { BuyingDocumentSummary, BuyingListParams, LookupOption } from "@/modules/buying/types/buying";
@@ -13,6 +14,7 @@ type ListResult = {
   data?: { data: BuyingDocumentSummary[]; total_count: number };
   isFetching: boolean;
   error?: unknown;
+  refetch: () => unknown;
 };
 
 export function BuyingDocumentList({
@@ -56,7 +58,9 @@ export function BuyingDocumentList({
         extra={
           <Space>
             <Button onClick={() => router.push(`${routeBase}/new`)} type="primary">Create</Button>
-            <Button onClick={() => setFilters((prev) => ({ ...prev }))} loading={result.isFetching}>Refresh</Button>
+            <Button icon={<ReloadOutlined />} onClick={() => void result.refetch()} loading={result.isFetching}>
+              Refresh
+            </Button>
           </Space>
         }
       >

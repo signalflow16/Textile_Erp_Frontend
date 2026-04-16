@@ -3,15 +3,20 @@
 import { Tag } from "antd";
 
 import type { DocumentStatus } from "@/modules/shared/document/types/document-engine";
+import { getStatusColor, getStatusLabel } from "@/core/utils/status";
 
-export function StatusBadge({ status }: { status?: DocumentStatus | null }) {
-  if (status === 1) {
-    return <Tag color="success" bordered={false}>Submitted</Tag>;
-  }
-
-  if (status === 2) {
-    return <Tag color="default" bordered={false}>Cancelled</Tag>;
-  }
-
-  return <Tag color="warning" bordered={false}>Draft</Tag>;
+export function StatusBadge({
+  docstatus,
+  status,
+  workflowState
+}: {
+  docstatus?: DocumentStatus | null;
+  status?: string | null;
+  workflowState?: string | null;
+}) {
+  return (
+    <Tag color={getStatusColor({ docstatus, status, workflow_state: workflowState })} bordered={false}>
+      {getStatusLabel({ docstatus, status, workflow_state: workflowState })}
+    </Tag>
+  );
 }

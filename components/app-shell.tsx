@@ -163,8 +163,11 @@ export function AppShell({
     return () => mediaQuery.removeEventListener("change", listener);
   }, []);
   useEffect(() => {
-    setExpandedModules(Object.fromEntries(modules.map((module) => [module.key, module.key === selectedModuleKey])));
-  }, [modules, selectedModuleKey]);
+    setExpandedModules((current) => ({
+      ...current,
+      [selectedModuleKey]: true
+    }));
+  }, [selectedModuleKey]);
 
   const handleLogout = async () => {
     try {
@@ -184,11 +187,10 @@ export function AppShell({
     }
   };
   const toggleModule = (moduleKey: string) => {
-    setExpandedModules((current) =>
-      Object.fromEntries(
-        modules.map((module) => [module.key, module.key === moduleKey ? !current[moduleKey] : false])
-      )
-    );
+    setExpandedModules((current) => ({
+      ...current,
+      [moduleKey]: !current[moduleKey]
+    }));
   };
 
   const navigationMenu = (
@@ -198,11 +200,13 @@ export function AppShell({
           <div className="brand-mark">
             <AntDesignOutlined />
           </div>
-          <Title level={4} className="brand-title" style={{ display: collapsed && !isMobile ? "none" : undefined }}>
-            Textile ERP
-          </Title>
+          <div className="brand-copy" style={{ display: collapsed && !isMobile ? "none" : undefined }}>
+            <Title level={4} className="brand-title">
+              Textile ERP
+            </Title>
+            <Text className="brand-kicker">ERPNext Workspace</Text>
+          </div>
         </div>
-        {!collapsed || isMobile ? <Text className="brand-kicker">ERPNext Workspace</Text> : null}
       </div>
       <nav className="sidebar-nav" aria-label="Application modules">
         {!collapsed || isMobile ? <div className="sidebar-section-title">Modules</div> : null}
@@ -263,64 +267,64 @@ export function AppShell({
   );
 
   return (
-    <div className="app-layout">
-      <header className="app-header">
-        <div className="app-header-main">
-          <div className="app-header-copy">
-            <div className="app-header-title-row">
+    <div className="app-container">
+      <aside
+        className={[
+          "app-sidebar",
+          collapsed ? "app-sidebar-collapsed" : "",
+          isMobile ? "app-sidebar-mobile" : ""
+        ].filter(Boolean).join(" ")}
+      >
+        <div className="app-sider-scroll no-scrollbar">{navigationMenu}</div>
+      </aside>
+
+      {isMobile && !collapsed ? (
+        <div className="sidebar-backdrop" onClick={() => setCollapsed(true)} aria-hidden />
+      ) : null}
+
+      <div className="app-main-area">
+        <header className="app-header">
+          <div className="app-header-main">
+            <div className="app-header-content">
+              <div className="header-top-row">
+                <Button
+                  type="text"
+                  className="sidebar-toggle-btn"
+                  icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => setCollapsed((prev) => !prev)}
+                />
+                <Text className="header-title">{title}</Text>
+              </div>
+              {breadcrumbItems?.length ? (
+                <Breadcrumb
+                  className="header-breadcrumb"
+                  separator={<CaretRightFilled className="header-breadcrumb-separator" />}
+                  items={breadcrumbItems}
+                />
+              ) : null}
+              {!collapsed && subtitle ? <div className="header-subtitle">{subtitle}</div> : null}
+            </div>
+            <div className="app-header-actions">
+              <div className="app-header-profile">
+                <Avatar size={32} className="app-header-avatar">
+                  {userInitial}
+                </Avatar>
+                {!isMobile ? <Text className="app-header-profile-name">{userName}</Text> : null}
+              </div>
               <Button
-                type="text"
-                className="sidebar-toggle-btn"
-                icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                onClick={() => setCollapsed((prev) => !prev)}
-              />
-              <Text className="header-title">{title}</Text>
+                danger
+                onClick={handleLogout}
+                icon={<LogoutOutlined />}
+                loading={logoutState.isLoading}
+              >
+                Logout
+              </Button>
             </div>
-            {breadcrumbItems?.length ? (
-              <Breadcrumb
-                className="header-breadcrumb"
-                separator={<CaretRightFilled className="header-breadcrumb-separator" />}
-                items={breadcrumbItems}
-              />
-            ) : null}
-            {!collapsed && subtitle ? <div className="header-subtitle">{subtitle}</div> : null}
           </div>
-          <div className="app-header-actions">
-            <div className="app-header-profile">
-              <Avatar size={32} className="app-header-avatar">
-                {userInitial}
-              </Avatar>
-              {!isMobile ? <Text className="app-header-profile-name">{userName}</Text> : null}
-            </div>
-            <Button
-              danger
-              onClick={handleLogout}
-              icon={<LogoutOutlined />}
-              loading={logoutState.isLoading}
-            >
-              Logout
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="app-body">
-        <aside
-          className={[
-            "app-sider",
-            collapsed ? "app-sider-collapsed" : "",
-            isMobile ? "app-sider-mobile" : ""
-          ].filter(Boolean).join(" ")}
-        >
-          <div className="app-sider-scroll">{navigationMenu}</div>
-        </aside>
-
-        {isMobile && !collapsed ? (
-          <div className="sidebar-backdrop" onClick={() => setCollapsed(true)} aria-hidden />
-        ) : null}
+        </header>
 
         <main className="app-main">
-          <div className="app-content">{children}</div>
+          <div className="app-content no-scrollbar">{children}</div>
         </main>
       </div>
     </div>

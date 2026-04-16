@@ -24,7 +24,16 @@ export function SummarySidebar({
     <Card title="Summary">
       <Space direction="vertical" size={14} style={{ width: "100%" }}>
         <div><Text type="secondary">{partyLabel}</Text><div>{document?.party || "-"}</div></div>
-        <div><Text type="secondary">Status</Text><div><StatusBadge status={document?.docstatus} /></div></div>
+        <div>
+          <Text type="secondary">Status</Text>
+          <div>
+            <StatusBadge
+              docstatus={document?.docstatus}
+              status={document?.status}
+              workflowState={document?.workflow_state}
+            />
+          </div>
+        </div>
         <div><Text type="secondary">Warehouse</Text><div>{document?.set_warehouse || "-"}</div></div>
         <div><Text type="secondary">Subtotal</Text><div>{total.toFixed(2)}</div></div>
         <div><Text type="secondary">Taxes</Text><div>{taxTotal.toFixed(2)}</div></div>

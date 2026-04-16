@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, DatePicker, Input, Space } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
 
 import { DataTable } from "@/components/tables/data-table";
 import { documentConfigs } from "@/modules/shared/document/api/documentEngine";
@@ -26,21 +27,20 @@ export function DocumentListPage({ doctype }: { doctype: DocumentEngineConfig["d
   const [search, setSearch] = useState("");
   const [dates, setDates] = useState<DateFilterValue>(null);
   const deferredSearch = useDeferredValue(search);
+  const listFilters = useMemo(
+    () => ({
+      search: deferredSearch,
+      fromDate: dates?.[0]?.format("YYYY-MM-DD"),
+      toDate: dates?.[1]?.format("YYYY-MM-DD"),
+      page: moduleState.pagination.current,
+      pageSize: moduleState.pagination.pageSize
+    }),
+    [dates, deferredSearch, moduleState.pagination.current, moduleState.pagination.pageSize]
+  );
 
   useEffect(() => {
-    void dispatch(
-      fetchDocumentList({
-        key: config.key,
-        filters: {
-          search: deferredSearch,
-          fromDate: dates?.[0]?.format("YYYY-MM-DD"),
-          toDate: dates?.[1]?.format("YYYY-MM-DD"),
-          page: moduleState.pagination.current,
-          pageSize: moduleState.pagination.pageSize
-        }
-      })
-    );
-  }, [config.key, dates, deferredSearch, dispatch, moduleState.pagination.current, moduleState.pagination.pageSize]);
+    void dispatch(fetchDocumentList({ key: config.key, filters: listFilters }));
+  }, [config.key, dispatch, listFilters]);
 
   const columns = useMemo<ColumnsType<(typeof entries)[number]>>(
     () => [
@@ -73,12 +73,13 @@ export function DocumentListPage({ doctype }: { doctype: DocumentEngineConfig["d
       },
       {
         title: "Status",
-        dataIndex: "docstatus",
-        key: "docstatus",
-        render: (value) => <StatusBadge status={value} />
+        key: "status",
+        render: (_, row) => (
+          <StatusBadge docstatus={row.docstatus} status={row.status} workflowState={row.workflow_state} />
+        )
       }
     ],
-    [config.partyField, config.routeBase, config.title, entries]
+    [config.partyField, config.routeBase, config.title]
   );
 
   return (
@@ -87,6 +88,13 @@ export function DocumentListPage({ doctype }: { doctype: DocumentEngineConfig["d
       <div className="stock-entry-list-toolbar">
         <Input allowClear value={search} placeholder={`Search ${config.title}`} onChange={(event) => setSearch(event.target.value)} />
         <DatePicker.RangePicker value={dates} onChange={(value) => setDates(value)} />
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={() => void dispatch(fetchDocumentList({ key: config.key, filters: listFilters }))}
+          loading={moduleState.commands.listStatus === "loading"}
+        >
+          Refresh
+        </Button>
         <Button type="primary">
           <Link href={`${config.routeBase}/create`}>New {config.title}</Link>
         </Button>

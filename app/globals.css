@@ -1,5 +1,7 @@
 :root {
   color-scheme: light;
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 64px;
 }
 
 * {
@@ -27,29 +29,31 @@ a {
   text-decoration: none;
 }
 
-.app-layout {
-  height: 100vh;
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.app-container {
   display: flex;
-  flex-direction: column;
+  height: 100vh;
+  width: 100%;
   overflow: hidden;
   background:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.07), transparent 28%),
     linear-gradient(180deg, #f8fafc 0%, #f3f6fb 100%);
 }
 
-.app-body {
-  min-height: 0;
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-  width: 100%;
-}
-
-.app-sider {
-  width: 256px;
-  flex: 0 0 256px;
+.app-sidebar {
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  height: 100vh;
   background: #ffffff;
-  border-right: 1px solid #e8ebf0;
+  border-right: 1px solid #f0f0f0;
   transition: all 300ms ease;
   overflow: hidden;
   position: relative;
@@ -59,18 +63,27 @@ a {
   height: 100%;
   overflow-y: auto;
   background: #ffffff;
+  padding: 0 10px 18px;
 }
 
-.app-sider-collapsed {
-  width: 64px;
-  flex-basis: 64px;
+.app-sidebar-collapsed {
+  width: var(--sidebar-collapsed-width);
+  min-width: var(--sidebar-collapsed-width);
+}
+
+.app-main-area {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .app-main {
   min-width: 0;
   min-height: 0;
   flex: 1;
-  width: 0;
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
@@ -78,14 +91,22 @@ a {
 }
 
 .brand-panel {
-  padding: 16px 16px 14px;
-  border-bottom: 1px solid #eef1f5;
+  padding: 16px 8px 14px;
+  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 8px;
+  min-height: 88px;
+  display: flex;
+  align-items: center;
 }
 
 .brand-row {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.brand-copy {
+  min-width: 0;
 }
 
 .brand-mark {
@@ -102,7 +123,7 @@ a {
 .brand-kicker {
   color: #7b8794 !important;
   display: block;
-  margin-top: 6px;
+  margin-top: 2px;
   font-size: 12px;
 }
 
@@ -119,28 +140,20 @@ a {
   letter-spacing: 0.06em;
   text-transform: uppercase;
   display: block;
-  padding: 14px 18px 8px;
-}
-
-.brand-panel-collapsed {
-  padding-inline: 0;
-}
-
-.brand-panel-collapsed .brand-row {
-  justify-content: center;
+  padding: 16px 18px 10px;
 }
 
 .app-header {
-  position: sticky;
-  top: 0;
   z-index: 10;
   line-height: 1.4;
-  min-height: 56px;
-  padding: 8px 20px;
-  background: rgba(255, 255, 255, 0.94);
-  border-bottom: 1px solid #e8ebf0;
-  backdrop-filter: blur(14px);
+  min-height: 88px;
+  width: 100%;
+  padding: 16px 24px;
+  background: #ffffff;
+  border-bottom: 1px solid #f0f0f0;
   animation: subtle-enter 240ms ease-out;
+  display: flex;
+  align-items: center;
 }
 
 .top-nav {
@@ -202,6 +215,7 @@ a {
   gap: 16px;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
 }
 
 .app-header-actions {
@@ -215,12 +229,20 @@ a {
   min-width: 0;
   display: grid;
   gap: 2px;
+  flex: 1;
 }
 
-.app-header-title-row {
+.app-header-content {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+}
+
+.header-top-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin-bottom: 4px;
 }
 
 .app-header-profile {
@@ -271,15 +293,16 @@ a {
 }
 
 .header-title {
-  font-size: 1rem;
+  font-size: 17px;
   font-weight: 600;
   color: #111827;
   line-height: 1.2;
 }
 
 .header-breadcrumb.ant-breadcrumb {
-  color: #6b7280;
-  font-size: 0.78rem;
+  color: #8c8c8c;
+  font-size: 12px;
+  margin-bottom: 4px;
 }
 
 .header-breadcrumb .ant-breadcrumb-link,
@@ -292,16 +315,16 @@ a {
 }
 
 .header-subtitle {
-  color: #475569;
+  color: #595959;
   margin-top: 0;
-  font-size: 0.78rem;
+  font-size: 13px;
 }
 
 .app-content {
   min-height: 100%;
   width: 100%;
   padding: 24px;
-  background: transparent;
+  background: #fafafa;
 }
 
 .document-layout {
@@ -1073,24 +1096,24 @@ a {
 .sidebar-module-list,
 .sidebar-icon-rail {
   display: grid;
-  gap: 12px;
+  gap: 8px;
 }
 
 .sidebar-module {
   display: grid;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid transparent;
-  border-left: 3px solid transparent;
-  border-radius: 16px;
+  gap: 6px;
+  padding: 8px 0;
+  border: 0;
+  border-left: 0;
+  border-radius: 0;
   background: transparent;
   transition: all 300ms ease;
 }
 
 .sidebar-module.is-active {
-  background: #fafafa;
-  border-color: #f0f0f0;
-  border-left-color: #1677ff;
+  background: transparent;
+  border-color: transparent;
+  border-left-color: transparent;
 }
 
 .sidebar-module-header-row {
@@ -1105,10 +1128,10 @@ a {
   align-items: center;
   gap: 10px;
   min-height: 40px;
-  padding: 0 4px;
+  padding: 0 10px;
   color: #0f172a;
-  font-weight: 700;
-  border-radius: 10px;
+  font-weight: 600;
+  border-radius: 12px;
   transition: all 300ms ease;
 }
 
@@ -1116,7 +1139,7 @@ a {
   width: 32px;
   height: 32px;
   color: #64748b;
-  border-radius: 10px;
+  border-radius: 12px;
 }
 
 .sidebar-module-toggle:hover {
@@ -1153,24 +1176,23 @@ a {
   min-height: 34px;
   display: flex;
   align-items: center;
-  padding: 0 10px;
-  border-radius: 10px;
+  padding: 0 12px;
+  border-radius: 12px;
   color: #475569;
-  border-left: 3px solid transparent;
+  border-left: 0;
   transition: all 300ms ease;
 }
 
 .sidebar-module-header:hover,
 .sidebar-module-link:hover,
 .sidebar-icon-link:hover {
-  background: rgba(15, 23, 42, 0.04);
+  background: #fafafa;
 }
 
 .sidebar-module-link.is-active {
-  background: #f0f7ff;
-  color: #0f172a;
-  font-weight: 700;
-  border-left-color: #1677ff;
+  background: #f5f7fa;
+  color: #1677ff;
+  font-weight: 500;
 }
 
 .sidebar-icon-rail {
@@ -1984,26 +2006,24 @@ a {
   }
 
   .app-header {
-    padding: 8px 16px;
+    padding: 12px 16px;
   }
 
-  .app-body {
-    position: relative;
-  }
-
-  .app-sider {
+  .app-sidebar {
     position: fixed;
-    top: 56px;
+    top: 0;
     left: 0;
     bottom: 0;
     width: min(280px, calc(100vw - 32px));
-    flex-basis: auto;
+    min-width: min(280px, calc(100vw - 32px));
     box-shadow: none;
     transform: translateX(0);
+    z-index: 12;
   }
 
-  .app-sider.app-sider-collapsed {
+  .app-sidebar.app-sidebar-collapsed {
     width: min(280px, calc(100vw - 32px));
+    min-width: min(280px, calc(100vw - 32px));
     transform: translateX(-100%);
   }
 
