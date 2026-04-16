@@ -395,6 +395,7 @@ export const selectItemGroupParentOptions = createSelector(
   (itemGroups, currentGroup): LookupOption[] => {
     if (!currentGroup) {
       return itemGroups
+        .filter((itemGroup) => itemGroup.is_group === 1)
         .slice()
         .sort((left, right) => left.item_group_name.localeCompare(right.item_group_name))
         .map((itemGroup) => ({
@@ -432,7 +433,7 @@ export const selectItemGroupParentOptions = createSelector(
     }
 
     return itemGroups
-      .filter((itemGroup) => !excluded.has(itemGroup.name))
+      .filter((itemGroup) => !excluded.has(itemGroup.name) && itemGroup.is_group === 1)
       .sort((left, right) => left.item_group_name.localeCompare(right.item_group_name))
       .map((itemGroup) => ({
         value: itemGroup.name,

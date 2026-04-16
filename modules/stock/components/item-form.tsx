@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, type Key } from "react";
+import { useDeferredValue, useEffect, useMemo, type Key } from "react";
 import { useRouter } from "next/navigation";
 import {
   App,
@@ -15,6 +15,7 @@ import {
   Row,
   Select,
   Space,
+  Tag,
   Tabs,
   Typography
 } from "antd";
@@ -23,6 +24,7 @@ import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import type { ItemDocument } from "@/modules/stock/types/item";
 import {
   useCreateItemMutation,
+  useGetItemCodeAvailabilityQuery,
   useGetItemLookupsQuery,
   useGetItemPriceSummaryQuery,
   useGetItemVariantAttributeLookupsQuery,
@@ -146,6 +148,8 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
   const variantMode = Form.useWatch("has_variants", form);
   const variantParent = Form.useWatch("variant_of", form);
   const imageValue = Form.useWatch("image", form);
+  const watchedItemCode = Form.useWatch("item_code", form) ?? "";
+  const deferredItemCode = useDeferredValue(watchedItemCode);
   const templateItemCode =
     mode === "edit"
       ? initialValues?.has_variants
@@ -160,6 +164,26 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
   const { data: priceSummary } = useGetItemPriceSummaryQuery(itemCode ?? "", {
     skip: mode !== "edit" || !itemCode
   });
+  const { data: itemCodeAvailability, isFetching: itemCodeCheckLoading } = useGetItemCodeAvailabilityQuery(
+    { itemCode: deferredItemCode, currentItemCode: itemCode },
+    {
+      skip: !deferredItemCode.trim()
+    }
+  );
+  const warehouseOptions = useMemo(() => lookups?.warehouses ?? [], [lookups?.warehouses]);
+
+  useEffect(() => {
+    if (mode !== "create" || !deferredItemCode.trim() || itemCodeAvailability?.exists) {
+      return;
+    }
+
+    form.setFields([
+      {
+        name: "item_code",
+        errors: []
+      }
+    ]);
+  }, [deferredItemCode, form, itemCodeAvailability?.exists, mode]);
 
   const onFinish = async (values: ItemFormValues) => {
     try {
@@ -171,6 +195,17 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
 
       if (values.has_variants && values.variant_of?.trim()) {
         message.error("Template item cannot be marked as Variant Of another item.");
+        return;
+      }
+
+      if (mode === "create" && itemCodeAvailability?.exists) {
+        form.setFields([
+          {
+            name: "item_code",
+            errors: ["Item Code already exists."]
+          }
+        ]);
+        message.error("Item Code already exists.");
         return;
       }
 
@@ -211,6 +246,15 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
               >
                 <Input size="large" disabled={mode === "edit"} />
               </Form.Item>
+              {mode === "create" && deferredItemCode.trim() ? (
+                <Text type={itemCodeAvailability?.exists ? "danger" : "secondary"}>
+                  {itemCodeCheckLoading
+                    ? "Checking Item Code availability..."
+                    : itemCodeAvailability?.exists
+                      ? "Item Code already exists."
+                      : "Item Code is available."}
+                </Text>
+              ) : null}
             </Col>
             <Col xs={24} md={10}>
               <Form.Item label="Item Name" name="item_name">
@@ -323,9 +367,17 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
                   allowClear
                   size="large"
                   loading={lookupsLoading}
-                  options={lookups?.warehouses ?? []}
+                  options={warehouseOptions}
                   showSearch
                   optionFilterProp="label"
+                  optionRender={(option) => (
+                    <Space size={8}>
+                      <span>{String(option.data.label)}</span>
+                      <Tag bordered={false} color={option.data.is_group ? "gold" : "blue"}>
+                        {option.data.is_group ? "Group" : "Leaf"}
+                      </Tag>
+                    </Space>
+                  )}
                 />
               </Form.Item>
             </Col>
@@ -604,7 +656,19 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
                           </Col>
                           <Col xs={24} md={8}>
                             <Form.Item {...itemProps} label={field.name === 0 ? "Default Warehouse" : ""} name={[field.name, "default_warehouse"]}>
-                              <Select options={lookups?.warehouses ?? []} showSearch optionFilterProp="label" />
+                              <Select
+                                options={warehouseOptions}
+                                showSearch
+                                optionFilterProp="label"
+                                optionRender={(option) => (
+                                  <Space size={8}>
+                                    <span>{String(option.data.label)}</span>
+                                    <Tag bordered={false} color={option.data.is_group ? "gold" : "blue"}>
+                                      {option.data.is_group ? "Group" : "Leaf"}
+                                    </Tag>
+                                  </Space>
+                                )}
+                              />
                             </Form.Item>
                           </Col>
                           <Col xs={20} md={7}>
@@ -787,7 +851,20 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
         )
       }
     ],
-    [form, imageValue, lookups, lookupsLoading, mode, variantLookups, variantMode, variantParent]
+    [
+      deferredItemCode,
+      form,
+      imageValue,
+      itemCodeAvailability?.exists,
+      itemCodeCheckLoading,
+      lookups,
+      lookupsLoading,
+      mode,
+      variantLookups,
+      variantMode,
+      variantParent,
+      warehouseOptions
+    ]
   );
 
   return (
@@ -807,11 +884,11 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
           </div>
           <Space>
             {mode === "edit" && itemCode ? (
-              <Button size="middle" href={`/stock/items/${encodeURIComponent(itemCode)}/prices`}>
+              <Button size="middle" onClick={() => router.push(`/stock/items/${encodeURIComponent(itemCode)}/prices`)}>
                 Manage Prices
               </Button>
             ) : null}
-            <Button size="middle" href="/stock/items">
+            <Button size="middle" onClick={() => router.push("/stock/items")}>
               Back
             </Button>
             <Button type="primary" htmlType="submit" size="middle" loading={saving}>

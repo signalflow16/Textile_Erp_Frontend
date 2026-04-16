@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { App, Button, Form, Input, Space, Tabs, Tag, Typography } from "antd";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { App, Button, Form, Input, Popconfirm, Space, Tabs, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
 import { FormModal } from "@/components/common/form-modal";
@@ -9,6 +9,7 @@ import { CustomerCreateForm, SupplierCreateForm } from "@/components/forms/party
 import { DataTable } from "@/components/tables/data-table";
 import {
   createParty,
+  deleteParty,
   fetchCustomers,
   fetchPartyLookups,
   fetchSuppliers,
@@ -19,8 +20,6 @@ import {
 } from "@/modules/stock/store/partySlice";
 import { useAppDispatch, useAppSelector } from "@/core/store/hooks";
 import type { CustomerCreateValues, CustomerRow, SupplierCreateValues, SupplierRow } from "@/modules/stock/types/master-data";
-
-const { Text } = Typography;
 
 export function StockPartiesPage() {
   const dispatch = useAppDispatch();
@@ -50,6 +49,15 @@ export function StockPartiesPage() {
     }
   }, [dispatch, partyState.fetchStatus.customers, partyState.fetchStatus.suppliers, partyState.lookupsStatus]);
 
+  const handleDelete = useCallback(async (type: "supplier" | "customer", name: string) => {
+    try {
+      await dispatch(deleteParty({ type, name })).unwrap();
+      message.success(`${type === "supplier" ? "Supplier" : "Customer"} deleted successfully.`);
+    } catch (error) {
+      message.error(typeof error === "string" ? error : `Unable to delete ${type}. It may have linked records.`);
+    }
+  }, [dispatch, message]);
+
   const supplierColumns = useMemo<ColumnsType<SupplierRow>>(
     () => [
       {
@@ -61,9 +69,28 @@ export function StockPartiesPage() {
       { title: "Group", dataIndex: "supplier_group", key: "supplier_group" },
       { title: "Type", dataIndex: "supplier_type", key: "supplier_type" },
       { title: "Mobile", dataIndex: "mobile_no", key: "mobile_no" },
-      { title: "Email", dataIndex: "email_id", key: "email_id" }
+      { title: "Email", dataIndex: "email_id", key: "email_id" },
+      {
+        title: "Actions",
+        key: "actions",
+        width: 120,
+        render: (_value, record) => (
+          <Popconfirm
+            title="Delete supplier?"
+            description="Are you sure?"
+            okText="Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete("supplier", record.name)}
+          >
+            <Button danger type="text" loading={partyState.deleteStatus.suppliers === "loading"}>
+              Delete
+            </Button>
+          </Popconfirm>
+        )
+      }
     ],
-    []
+    [handleDelete, partyState.deleteStatus.suppliers]
   );
 
   const customerColumns = useMemo<ColumnsType<CustomerRow>>(
@@ -77,9 +104,28 @@ export function StockPartiesPage() {
       { title: "Group", dataIndex: "customer_group", key: "customer_group" },
       { title: "Territory", dataIndex: "territory", key: "territory" },
       { title: "Mobile", dataIndex: "mobile_no", key: "mobile_no" },
-      { title: "Email", dataIndex: "email_id", key: "email_id" }
+      { title: "Email", dataIndex: "email_id", key: "email_id" },
+      {
+        title: "Actions",
+        key: "actions",
+        width: 120,
+        render: (_value, record) => (
+          <Popconfirm
+            title="Delete customer?"
+            description="Are you sure?"
+            okText="Delete"
+            cancelText="Cancel"
+            okButtonProps={{ danger: true }}
+            onConfirm={() => handleDelete("customer", record.name)}
+          >
+            <Button danger type="text" loading={partyState.deleteStatus.customers === "loading"}>
+              Delete
+            </Button>
+          </Popconfirm>
+        )
+      }
     ],
-    []
+    [handleDelete, partyState.deleteStatus.customers]
   );
 
   const filteredSuppliers = useMemo(

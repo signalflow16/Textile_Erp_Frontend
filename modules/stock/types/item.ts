@@ -3,6 +3,10 @@ export type LookupOption = {
   value: string;
 };
 
+export type WarehouseLookupOption = LookupOption & {
+  is_group?: 0 | 1;
+};
+
 export type ItemAttributeValueOption = {
   label: string;
   value: string;
@@ -116,7 +120,7 @@ export type ItemMasterLookups = {
   item_groups: LookupOption[];
   uoms: LookupOption[];
   brands: LookupOption[];
-  warehouses: LookupOption[];
+  warehouses: WarehouseLookupOption[];
   quality_templates: LookupOption[];
   tax_templates: LookupOption[];
   price_lists: LookupOption[];

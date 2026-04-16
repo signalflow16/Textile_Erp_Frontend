@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { Alert, Button, Card, Input, Select, Space, Table } from "antd";
 
@@ -31,6 +32,7 @@ export function BuyingDocumentList({
   suppliers: LookupOption[];
   useList: (params: BuyingListParams) => ListResult;
 }) {
+  const router = useRouter();
   const [filters, setFilters] = useState<BuyingListParams>({
     page: 1,
     pageSize: 20,
@@ -53,7 +55,7 @@ export function BuyingDocumentList({
         title={title}
         extra={
           <Space>
-            <Button href={`${routeBase}/new`} type="primary">Create</Button>
+            <Button onClick={() => router.push(`${routeBase}/new`)} type="primary">Create</Button>
             <Button onClick={() => setFilters((prev) => ({ ...prev }))} loading={result.isFetching}>Refresh</Button>
           </Space>
         }

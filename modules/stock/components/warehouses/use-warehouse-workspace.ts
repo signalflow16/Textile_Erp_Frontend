@@ -7,9 +7,11 @@ import { App } from "antd";
 import { useDebouncedValue } from "@/core/hooks/useDebouncedValue";
 import {
   deleteWarehouse,
+  fetchWarehouseDeleteGuard,
   fetchWarehouseDetail,
   fetchWarehouseLookups,
   fetchWarehouses,
+  selectWarehouseDeleteCheck,
   selectSelectedWarehouse,
   selectWarehouseCompanies,
   selectWarehouseState,
@@ -46,6 +48,9 @@ export function useWarehouseWorkspace(defaultSelectedWarehouse?: string) {
   const selectedWarehouse = useAppSelector(selectSelectedWarehouse);
   const companies = useAppSelector(selectWarehouseCompanies);
   const tree = useAppSelector(selectWarehouseTree);
+  const selectedWarehouseDeleteCheck = useAppSelector((state) =>
+    warehouseState.selectedWarehouse ? selectWarehouseDeleteCheck(state, warehouseState.selectedWarehouse) : undefined
+  );
 
   const [search, setSearch] = useState("");
   const [expandedKeys, setExpandedKeys] = useState<string[]>([]);
@@ -72,6 +77,17 @@ export function useWarehouseWorkspace(defaultSelectedWarehouse?: string) {
       void dispatch(fetchWarehouseDetail(warehouseState.selectedWarehouse));
     }
   }, [dispatch, warehouseState.selectedWarehouse]);
+
+  useEffect(() => {
+    if (!warehouseState.selectedWarehouse) {
+      return;
+    }
+
+    const current = warehouseState.stockChecks[warehouseState.selectedWarehouse];
+    if (!current) {
+      void dispatch(fetchWarehouseDeleteGuard(warehouseState.selectedWarehouse));
+    }
+  }, [dispatch, warehouseState.selectedWarehouse, warehouseState.stockChecks]);
 
   const filteredTree = useMemo(() => filterTree(tree, debouncedSearch), [debouncedSearch, tree]);
   const allKeys = useMemo(() => collectKeys(filteredTree), [filteredTree]);
@@ -116,6 +132,25 @@ export function useWarehouseWorkspace(defaultSelectedWarehouse?: string) {
       } catch (error) {
         message.error(typeof error === "string" ? error : "Unable to delete warehouse.");
       }
+    },
+    getDeleteState: (warehouse: WarehouseNode) => {
+      const check =
+        warehouseState.selectedWarehouse === warehouse.name
+          ? selectedWarehouseDeleteCheck
+          : warehouseState.stockChecks[warehouse.name];
+
+      if (check?.loading) {
+        return { loading: true };
+      }
+
+      if (check?.hasStock) {
+        return {
+          loading: false,
+          disabledReason: "Cannot delete warehouse with existing stock"
+        };
+      }
+
+      return { loading: false };
     },
     expandAll: () => setExpandedKeys(allKeys),
     collapseAll: () => setExpandedKeys([]),

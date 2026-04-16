@@ -33,7 +33,7 @@ export function WarehouseEditor({
   const parentOptions = useMemo(
     () =>
       allWarehouses
-        .filter((warehouse) => (warehouseName ? warehouse.name !== warehouseName : true))
+        .filter((warehouse) => (warehouseName ? warehouse.name !== warehouseName : true) && warehouse.is_group === 1)
         .sort((left, right) => (left.warehouse_name ?? left.name).localeCompare(right.warehouse_name ?? right.name))
         .map((warehouse) => ({
           value: warehouse.name,

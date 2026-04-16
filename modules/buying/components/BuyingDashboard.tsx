@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Alert, Button, Card, Col, Row, Space, Table, Typography } from "antd";
 import { ReloadOutlined } from "@ant-design/icons";
 
@@ -46,6 +47,7 @@ const routeForDocType = (doctype: string, name: string) => {
 };
 
 export function BuyingDashboard() {
+  const router = useRouter();
   const query = useBuyingDashboard();
 
   return (
@@ -112,7 +114,7 @@ export function BuyingDashboard() {
           <Card title="Quick Actions">
             <Space direction="vertical" size={8} style={{ width: "100%" }}>
               {shortcuts.map((shortcut) => (
-                <Button key={shortcut.href} block href={shortcut.href}>
+                <Button key={shortcut.href} block onClick={() => router.push(shortcut.href)}>
                   {shortcut.label}
                 </Button>
               ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Alert, App, Button, Card, Descriptions, Space, Table, Typography } from "antd";
 
 import { CreateNextActions } from "@/modules/buying/components/common/CreateNextActions";
@@ -34,6 +35,7 @@ export function BuyingDocumentDetail({
   financeImpactNote?: string;
 }) {
   const { message } = App.useApp();
+  const router = useRouter();
 
   if (error) {
     return <Alert type="error" showIcon message="Unable to load document" description={toBuyingErrorMessage(error, "Request failed.")} />;
@@ -45,6 +47,7 @@ export function BuyingDocumentDetail({
 
   const doc = document ?? {};
   const items = Array.isArray(doc.items) ? (doc.items as Array<Record<string, unknown>>) : [];
+  const docName = typeof doc.name === "string" ? doc.name : null;
   const canEdit = isDraft((typeof doc.docstatus === "number" ? doc.docstatus : undefined) as 0 | 1 | 2 | undefined);
   const sourceReference = (
     [
@@ -63,10 +66,13 @@ export function BuyingDocumentDetail({
         loading={loading}
         extra={
           <Space>
-            <Button href={routeBase}>Back to List</Button>
-            {canEdit && typeof doc.name === "string" ? (
+            <Button onClick={() => router.push(routeBase)}>Back to List</Button>
+            {canEdit && docName ? (
               <>
-                <Button type="primary" href={`${routeBase}/${encodeURIComponent(doc.name)}?edit=1`}>
+                <Button
+                  type="primary"
+                  onClick={() => router.push(`${routeBase}/${encodeURIComponent(docName)}?edit=1`)}
+                >
                   Edit Draft
                 </Button>
                 {onSubmitDraft ? (
@@ -74,7 +80,6 @@ export function BuyingDocumentDetail({
                     type="default"
                     loading={submitLoading}
                     onClick={async () => {
-                      const docName = typeof doc.name === "string" ? doc.name : null;
                       if (!docName) {
                         message.error("Document name is missing.");
                         return;

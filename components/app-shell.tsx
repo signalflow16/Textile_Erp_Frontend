@@ -138,10 +138,14 @@ export function AppShell({
     ],
     []
   );
-  const selectedLink =
-    modules.flatMap((module) => module.links.map((link) => ({ moduleKey: module.key, link }))).find(({ link }) =>
-      isPathActive(link.href, link.matchPrefixes)
-    ) ?? null;
+  const selectedLink = useMemo(
+    () =>
+      modules
+        .flatMap((module) => module.links.map((link) => ({ moduleKey: module.key, link })))
+        .filter(({ link }) => isPathActive(link.href, link.matchPrefixes))
+        .sort((left, right) => right.link.href.length - left.link.href.length)[0] ?? null,
+    [modules, pathname]
+  );
   const selectedPageKey = selectedLink?.link.key ?? "stock-dashboard";
   const selectedModuleKey =
     selectedLink?.moduleKey ??
@@ -165,11 +169,8 @@ export function AppShell({
     return () => mediaQuery.removeEventListener("change", listener);
   }, []);
   useEffect(() => {
-    setExpandedModules((current) => ({
-      ...current,
-      [selectedModuleKey]: true
-    }));
-  }, [selectedModuleKey]);
+    setExpandedModules(Object.fromEntries(modules.map((module) => [module.key, module.key === selectedModuleKey])));
+  }, [modules, selectedModuleKey]);
 
   const handleLogout = async () => {
     try {
@@ -189,10 +190,11 @@ export function AppShell({
     }
   };
   const toggleModule = (moduleKey: string) => {
-    setExpandedModules((current) => ({
-      ...current,
-      [moduleKey]: !current[moduleKey]
-    }));
+    setExpandedModules((current) =>
+      Object.fromEntries(
+        modules.map((module) => [module.key, module.key === moduleKey ? !current[moduleKey] : false])
+      )
+    );
   };
 
   const navigationMenu = (
