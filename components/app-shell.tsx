@@ -201,12 +201,18 @@ export function AppShell({
 
   const navigationMenu = (
     <>
-      <div className={`brand-panel ${collapsed && !isMobile ? "brand-panel-collapsed" : ""}`}>
+          <div
+        className={`brand-panel ${collapsed && !isMobile ? "brand-panel-collapsed" : ""}`}
+        >
         <div className="brand-row">
           <div className="brand-mark">
             <AntDesignOutlined />
           </div>
-          <div className="brand-copy" style={{ display: collapsed && !isMobile ? "none" : undefined }}>
+
+          <div
+            className="brand-copy"
+            style={{ display: collapsed && !isMobile ? "none" : undefined }}
+          >
             <Title level={4} className="brand-title">
               Textile ERP
             </Title>

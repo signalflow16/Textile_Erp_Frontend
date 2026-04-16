@@ -210,7 +210,7 @@ export const createItem = createAsyncThunk<ItemMasterRow, ItemCreateValues, { st
     const state = thunkApi.getState();
     const { fieldAvailability } = state.items;
     const payload: Record<string, unknown> = {
-      item_code: values.item_name.trim(),
+      item_code: values.item_code.trim(),
       item_name: values.item_name.trim(),
       item_group: values.item_group,
       stock_uom: values.stock_uom,

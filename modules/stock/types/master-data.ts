@@ -26,6 +26,7 @@ export type ItemMasterRow = {
 };
 
 export type ItemCreateValues = {
+  item_code: string;
   item_name: string;
   item_group: string;
   stock_uom: string;

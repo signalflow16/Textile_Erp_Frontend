@@ -34,7 +34,7 @@ export function FormModal({
       okText={okText}
       confirmLoading={confirmLoading}
       okButtonProps={okButtonProps as ModalProps["okButtonProps"]}
-      destroyOnClose
+      destroyOnHidden
     >
       {children}
     </Modal>

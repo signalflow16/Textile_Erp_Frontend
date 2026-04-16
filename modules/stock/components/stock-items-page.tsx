@@ -28,6 +28,7 @@ export function StockItemsPage() {
   const [searchText, setSearchText] = useState("");
   const [itemGroup, setItemGroup] = useState<string | undefined>(undefined);
   const [modalOpen, setModalOpen] = useState(false);
+  const [itemCodeValidating, setItemCodeValidating] = useState(false);
   const deferredSearch = useDeferredValue(searchText);
 
   const items = useAppSelector(selectAllItems);
@@ -119,11 +120,16 @@ export function StockItemsPage() {
 
   const handleCreate = async () => {
     try {
+      if (itemCodeValidating || form.isFieldValidating("item_code")) {
+        return;
+      }
+
       const values = await form.validateFields();
       await dispatch(createItem(values)).unwrap();
       message.success("Item created successfully.");
       form.resetFields();
       setModalOpen(false);
+      setItemCodeValidating(false);
     } catch (error) {
       if (typeof error === "object" && error && "errorFields" in error) {
         return;
@@ -204,12 +210,19 @@ export function StockItemsPage() {
         onCancel={() => {
           form.resetFields();
           setModalOpen(false);
+          setItemCodeValidating(false);
         }}
         onOk={handleCreate}
         okText="Create Item"
         confirmLoading={itemsState.createStatus === "loading"}
+        okButtonProps={{ disabled: itemCodeValidating }}
       >
-        <ItemCreateForm form={form} lookups={lookups} fieldAvailability={fieldAvailability} />
+        <ItemCreateForm
+          form={form}
+          lookups={lookups}
+          fieldAvailability={fieldAvailability}
+          onItemCodeValidationChange={setItemCodeValidating}
+        />
       </FormModal>
     </div>
   );
