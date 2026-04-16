@@ -281,7 +281,7 @@ export function AppShell({
           isMobile ? "app-sidebar-mobile" : ""
         ].filter(Boolean).join(" ")}
       >
-        <div className="app-sider-scroll">{navigationMenu}</div>
+        <div className="app-sider-scroll no-scrollbar">{navigationMenu}</div>
       </aside>
 
       {isMobile && !collapsed ? (
@@ -330,7 +330,7 @@ export function AppShell({
         </header>
 
         <main className="app-main">
-          <div className="app-content">{children}</div>
+          <div className="app-content no-scrollbar">{children}</div>
         </main>
       </div>
     </div>
