@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { PosOpeningEntryPage } from "@/modules/pos/components/PosOpeningEntryPage";
+import { PosModulePage } from "@/modules/pos/components/PosModulePage";
 import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function PosOpeningPage() {
@@ -9,8 +9,8 @@ export default function PosOpeningPage() {
 
   useEffect(() => {
     setConfig({
-      title: "POS Opening Entry",
-      subtitle: "Start POS session before billing."
+      title: "Point of Sale",
+      subtitle: "Run ERPNext POS billing for walk-in or registered customers."
     });
 
     return () => {
@@ -21,5 +21,5 @@ export default function PosOpeningPage() {
     };
   }, [setConfig]);
 
-  return <PosOpeningEntryPage />;
+  return <PosModulePage initialModal="opening" />;
 }

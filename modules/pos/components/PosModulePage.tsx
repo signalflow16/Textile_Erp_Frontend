@@ -1,19 +1,24 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
-import { Button, Card, Space, Spin, Typography } from "antd";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { Card, Space, Spin, Typography } from "antd";
 
 import { PosBillingPage } from "@/modules/pos/components/PosBillingPage";
+import { PosClosingEntryModal } from "@/modules/pos/components/PosClosingEntryModal";
+import { PosOpeningEntryModal } from "@/modules/pos/components/PosOpeningEntryModal";
 import { useActivePosSession } from "@/modules/pos/hooks/useActivePosSession";
 import { getActivePosSession } from "@/modules/pos/utils/posSessionService";
 
 const { Text } = Typography;
 
-export function PosModulePage() {
-  const router = useRouter();
+export function PosModulePage({
+  initialModal
+}: {
+  initialModal?: "opening" | "closing";
+}) {
   const active = useActivePosSession();
+  const [openingModalOpen, setOpeningModalOpen] = useState(initialModal === "opening");
+  const [closingModalOpen, setClosingModalOpen] = useState(initialModal === "closing");
 
   useEffect(() => {
     if (active.isLoading) {
@@ -21,9 +26,23 @@ export function PosModulePage() {
     }
 
     if (!active.session) {
-      router.replace("/pos/opening");
+      setClosingModalOpen(false);
+      setOpeningModalOpen(true);
+      return;
     }
-  }, [active.isLoading, active.session, router]);
+
+    setOpeningModalOpen(false);
+    if (initialModal === "closing") {
+      setClosingModalOpen(true);
+    }
+  }, [active.isLoading, active.session, initialModal]);
+
+  const handleRefreshSession = () => {
+    void getActivePosSession(async () => {
+      const result = await active.refetch();
+      return result.data ?? null;
+    });
+  };
 
   if (active.isLoading) {
     return (
@@ -36,29 +55,33 @@ export function PosModulePage() {
     );
   }
 
-  if (!active.session) {
-    return (
-      <Card>
-        <Space direction="vertical" size={8}>
-          <Text strong>Start POS session before billing</Text>
-          <Text type="secondary">Redirecting to opening entry...</Text>
-          <Link href="/pos/opening">
-            <Button type="primary">Start Session</Button>
-          </Link>
-        </Space>
-      </Card>
-    );
-  }
-
   return (
-    <PosBillingPage
-      session={active.session}
-      onRefreshSession={() => {
-        void getActivePosSession(async () => {
-          const result = await active.refetch();
-          return result.data ?? null;
-        });
-      }}
-    />
+    <>
+      <PosBillingPage
+        session={active.session}
+        onRefreshSession={handleRefreshSession}
+        onOpenSession={() => setOpeningModalOpen(true)}
+        onCloseSession={() => setClosingModalOpen(true)}
+      />
+
+      <PosOpeningEntryModal
+        open={openingModalOpen}
+        onCancel={() => setOpeningModalOpen(false)}
+        onSuccess={() => {
+          setOpeningModalOpen(false);
+          handleRefreshSession();
+        }}
+      />
+
+      <PosClosingEntryModal
+        open={closingModalOpen}
+        session={active.session}
+        onCancel={() => setClosingModalOpen(false)}
+        onSuccess={() => {
+          setClosingModalOpen(false);
+          handleRefreshSession();
+        }}
+      />
+    </>
   );
 }

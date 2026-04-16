@@ -49,7 +49,19 @@ export function BillPreviewPanel({
             <Text>{totals.subtotal.toFixed(2)}</Text>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <Text type="secondary">Discount</Text>
+            <Text type="secondary">Item Discount</Text>
+            <Text>{totals.itemDiscountTotal.toFixed(2)}</Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Text type="secondary">Net Subtotal</Text>
+            <Text>{totals.netSubtotal.toFixed(2)}</Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Text type="secondary">Overall Discount</Text>
+            <Text>{totals.overallDiscountTotal.toFixed(2)}</Text>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between" }}>
+            <Text type="secondary">Discount Total</Text>
             <Text>{totals.discountTotal.toFixed(2)}</Text>
           </div>
           <div style={{ display: "flex", justifyContent: "space-between" }}>

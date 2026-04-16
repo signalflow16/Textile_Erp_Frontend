@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { PosClosingEntryPage } from "@/modules/pos/components/PosClosingEntryPage";
+import { PosModulePage } from "@/modules/pos/components/PosModulePage";
 import { useAppShell } from "@/core/context/app-shell-context";
 
 export default function PosClosingPage() {
@@ -9,8 +9,8 @@ export default function PosClosingPage() {
 
   useEffect(() => {
     setConfig({
-      title: "POS Closing Entry",
-      subtitle: "End POS session and verify collected amount."
+      title: "Point of Sale",
+      subtitle: "Run ERPNext POS billing for walk-in or registered customers."
     });
 
     return () => {
@@ -21,5 +21,5 @@ export default function PosClosingPage() {
     };
   }, [setConfig]);
 
-  return <PosClosingEntryPage />;
+  return <PosModulePage initialModal="closing" />;
 }

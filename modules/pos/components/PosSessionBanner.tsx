@@ -1,7 +1,6 @@
 "use client";
 
 import { Alert, Button, Space, Tag, Typography } from "antd";
-import Link from "next/link";
 
 import type { PosSession } from "@/modules/pos/types/pos";
 
@@ -9,10 +8,12 @@ const { Text } = Typography;
 
 export function PosSessionBanner({
   session,
-  onRefresh
+  onRefresh,
+  onCloseSession
 }: {
   session: PosSession;
   onRefresh?: () => void;
+  onCloseSession?: () => void;
 }) {
   const openingCash = session.opening_amounts
     .filter((row) => row.mode_of_payment.toLowerCase().includes("cash"))
@@ -22,20 +23,24 @@ export function PosSessionBanner({
     <Alert
       type="info"
       showIcon
-      message="Add items, collect payment, and create bill"
+      message="POS session is active and ready for billing"
       description={
         <Space direction="vertical" size={4}>
           <Text>
-            Session: <strong>{session.name}</strong> | Profile: <strong>{session.pos_profile}</strong>
+            Session: <strong>{session.name}</strong> | Profile: <strong>{session.pos_profile}</strong>{" "}
+            <Tag color="green">{session.status ?? "Open"}</Tag>
           </Text>
           <Text>
             Opening Cash: <strong>{openingCash.toFixed(2)}</strong>{" "}
             {session.company ? <Tag color="blue">{session.company}</Tag> : null}
           </Text>
+          {session.opening_time ? (
+            <Text type="secondary">Opened at {session.opening_time}</Text>
+          ) : null}
           <Space>
-            <Link href="/pos/closing">
-              <Button size="small">Close Session</Button>
-            </Link>
+            <Button size="small" onClick={onCloseSession}>
+              Close Session
+            </Button>
             {onRefresh ? (
               <Button size="small" type="link" onClick={onRefresh}>
                 Refresh Session

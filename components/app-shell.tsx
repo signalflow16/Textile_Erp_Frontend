@@ -113,18 +113,12 @@ export function AppShell({
         icon: <AppstoreOutlined />,
         href: "/selling",
         matchPrefixes: ["/selling"],
-        links: [{ key: "selling-sales-invoices", label: "Sales Invoices", href: "/selling", matchPrefixes: ["/selling/sales-invoices"] }]
-      },
-      {
-        key: "pos",
-        label: "POS",
-        icon: <AppstoreOutlined />,
-        href: "/pos",
-        matchPrefixes: ["/pos"],
         links: [
-          { key: "pos-billing", label: "Billing", href: "/pos" },
-          { key: "pos-opening", label: "Opening Entry", href: "/pos/opening" },
-          { key: "pos-closing", label: "Closing Entry", href: "/pos/closing" }
+          { key: "selling-dashboard", label: "Dashboard", href: "/selling" },
+          { key: "selling-quotations", label: "Quotation", href: "/selling/quotations" },
+          { key: "selling-sales-orders", label: "Sales Order", href: "/selling/sales-orders" },
+          { key: "selling-delivery-notes", label: "Delivery Note", href: "/selling/delivery-notes" },
+          { key: "selling-pos", label: "POS", href: "/pos", matchPrefixes: ["/pos"] }
         ]
       },
       {

@@ -9,8 +9,8 @@ export default function PosPage() {
 
   useEffect(() => {
     setConfig({
-      title: "POS Billing",
-      subtitle: "Create bill quickly for walk-in or registered customers."
+      title: "Point of Sale",
+      subtitle: "Run ERPNext POS billing for walk-in or registered customers."
     });
 
     return () => {

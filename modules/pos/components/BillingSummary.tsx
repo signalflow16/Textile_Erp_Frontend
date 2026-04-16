@@ -12,6 +12,9 @@ export function BillingSummary({ totals }: { totals: PosTotals }) {
       <Descriptions column={1} size="small">
         <Descriptions.Item label="Total Items">{totals.totalItems}</Descriptions.Item>
         <Descriptions.Item label="Subtotal">{totals.subtotal.toFixed(2)}</Descriptions.Item>
+        <Descriptions.Item label="Item Discount">{totals.itemDiscountTotal.toFixed(2)}</Descriptions.Item>
+        <Descriptions.Item label="Net Subtotal">{totals.netSubtotal.toFixed(2)}</Descriptions.Item>
+        <Descriptions.Item label="Overall Discount">{totals.overallDiscountTotal.toFixed(2)}</Descriptions.Item>
         <Descriptions.Item label="Discount Total">{totals.discountTotal.toFixed(2)}</Descriptions.Item>
         <Descriptions.Item label={<Text strong>Grand Total</Text>}>
           <Text strong>{totals.grandTotal.toFixed(2)}</Text>

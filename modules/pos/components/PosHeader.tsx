@@ -1,37 +1,54 @@
 "use client";
 
-import { Typography } from "antd";
+import { PrinterOutlined } from "@ant-design/icons";
+import { Button, Space, Tag, Typography } from "antd";
 
-import { DocumentActionBar } from "@/modules/buying/components/common/DocumentActionBar";
+import { SaveDraftButton } from "@/modules/buying/components/common/SaveDraftButton";
 
 const { Text, Title } = Typography;
 
 export function PosHeader({
   isSaving,
   isSubmitting,
+  currentBillName,
+  currentBillStatus,
   onSaveDraft,
-  onSaveSubmit
+  onSavePrint
 }: {
   isSaving: boolean;
   isSubmitting: boolean;
+  currentBillName?: string | null;
+  currentBillStatus?: string;
   onSaveDraft: () => void;
-  onSaveSubmit: () => void;
+  onSavePrint: () => void;
 }) {
   return (
     <div className="pos-header">
       <div>
         <Title level={4} style={{ marginBottom: 4 }}>
-          POS Billing
+          Point of Sale
         </Title>
-        <Text type="secondary">Create bill quickly for walk-in or registered customers.</Text>
+        <Text type="secondary">Create ERPNext POS bills for walk-in or registered customers.</Text>
+        {currentBillName ? (
+          <div style={{ marginTop: 8 }}>
+            <Tag color={currentBillStatus === "Submitted" ? "green" : "gold"}>
+              {currentBillStatus}: {currentBillName}
+            </Tag>
+          </div>
+        ) : null}
       </div>
-      <DocumentActionBar
-        canEdit
-        isSaving={isSaving}
-        isSubmitting={isSubmitting}
-        onSaveDraft={onSaveDraft}
-        onSaveSubmit={onSaveSubmit}
-      />
+      <Space>
+        <SaveDraftButton loading={isSaving} disabled={isSubmitting} onClick={onSaveDraft} />
+        <Button
+          type="primary"
+          icon={<PrinterOutlined />}
+          loading={isSubmitting}
+          disabled={isSaving}
+          onClick={onSavePrint}
+        >
+          Save & Print
+        </Button>
+      </Space>
     </div>
   );
 }

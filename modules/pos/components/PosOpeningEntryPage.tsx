@@ -25,6 +25,7 @@ export function PosOpeningEntryPage() {
   const [form] = Form.useForm<OpeningFormValues>();
   const activeSession = useActivePosSession();
   const opening = usePosOpeningEntry();
+  const openingTimestamp = useMemo(() => new Date().toLocaleString(), []);
 
   const selectedProfile = Form.useWatch("pos_profile", form);
   const profileOptions = opening.profiles;
@@ -86,6 +87,10 @@ export function PosOpeningEntryPage() {
 
         <Form<OpeningFormValues> layout="vertical" form={form} initialValues={{ opening_cash: 0 }}>
           <div className="pos-payment-grid">
+            <Form.Item label="Opening Time">
+              <Input value={openingTimestamp} readOnly />
+            </Form.Item>
+
             <Form.Item
               label="POS Profile"
               name="pos_profile"

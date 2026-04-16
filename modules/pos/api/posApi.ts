@@ -2,6 +2,7 @@ import { frappeApi } from "@/core/api/frappeApi";
 import type { FrappeApiError, FrappeDocResponse, FrappeListResponse } from "@/modules/buying/types/frappe";
 import { submitDoc } from "@/modules/buying/api/documentActions";
 import type {
+  PosDraftInvoiceLookup,
   PosClosingEntryPayload,
   PosCustomerLookup,
   PosHsCodeLookup,
@@ -78,6 +79,10 @@ const toIsoDateTime = (value?: string) => {
 };
 
 const toDateOnly = (value?: string) => toIsoDateTime(value).slice(0, 10);
+const toDocStatus = (value: unknown) => {
+  const parsed = toNumber(value);
+  return parsed === 1 || parsed === 2 ? (parsed as 1 | 2) : 0;
+};
 
 const toOpeningAmounts = (row: Record<string, unknown>): PosOpeningAmountRow[] => {
   const candidates = [row.balance_details, row.opening_amounts, row.payments];
@@ -136,6 +141,7 @@ const toPosSession = (row: Record<string, unknown>, profile?: PosProfileLookup):
     toString(row.period_start_date) ??
     toString(row.opening_time) ??
     toString(row.creation),
+  closing_time: toString(row.period_end_date),
   posting_date: toString(row.posting_date),
   remarks: toString(row.remarks),
   warehouse: toString(row.set_warehouse) ?? profile?.warehouse,
@@ -164,6 +170,67 @@ const toModeSummary = (rows: Array<{ mode_of_payment: string; amount: number }>)
     amount: Number(amount.toFixed(2))
   }));
 };
+
+const mapPosInvoiceDoc = (row: Record<string, unknown>): PosInvoiceDoc => ({
+  name: toString(row.name),
+  customer: toString(row.customer) ?? "Walk-in Customer",
+  posting_date: toString(row.posting_date) ?? toDateOnly(),
+  due_date: toString(row.due_date),
+  is_pos: 1,
+  update_stock: 1,
+  pos_profile: toString(row.pos_profile),
+  pos_opening_entry: toString(row.pos_opening_entry),
+  set_warehouse: toString(row.set_warehouse),
+  remarks: toString(row.remarks),
+  mode_of_payment: toString(row.mode_of_payment),
+  paid_amount: toNumber(row.paid_amount),
+  additional_discount_percentage: toNumber(row.additional_discount_percentage),
+  apply_discount_on: toString(row.apply_discount_on),
+  items: Array.isArray(row.items)
+    ? row.items.reduce<PosInvoiceDoc["items"]>((acc, item) => {
+      if (!item || typeof item !== "object") {
+        return acc;
+      }
+
+      const entry = item as Record<string, unknown>;
+      acc.push({
+        item_code: toString(entry.item_code) ?? "",
+        item_name: toString(entry.item_name),
+        qty: toNumber(entry.qty),
+        uom: toString(entry.uom) ?? toString(entry.stock_uom),
+        rate: toNumber(entry.rate),
+        gst_hsn_code: itemHsCode(entry),
+        discount_percentage: toNumber(entry.discount_percentage),
+        discount_amount: toNumber(entry.discount_amount),
+        barcode: toString(entry.barcode),
+        warehouse: toString(entry.warehouse)
+      });
+      return acc;
+    }, [])
+    : [],
+  payments: Array.isArray(row.payments)
+    ? row.payments
+      .map((payment) => {
+        if (!payment || typeof payment !== "object") {
+          return null;
+        }
+
+        const entry = payment as Record<string, unknown>;
+        const modeOfPayment = toString(entry.mode_of_payment);
+        if (!modeOfPayment) {
+          return null;
+        }
+
+        return {
+          mode_of_payment: modeOfPayment,
+          amount: toNumber(entry.amount)
+        };
+      })
+      .filter((payment): payment is NonNullable<PosInvoiceDoc["payments"]>[number] => Boolean(payment))
+    : undefined,
+  docstatus: toDocStatus(row.docstatus),
+  status: toString(row.status)
+});
 
 export const posApi = frappeApi.injectEndpoints({
   endpoints: (builder) => ({
@@ -279,6 +346,24 @@ export const posApi = frappeApi.injectEndpoints({
           const active = rows.find((row) => isActiveOpening(row));
           if (!active) {
             continue;
+          }
+
+          const closingCheck = await run({
+            url: "/resource/POS Closing Entry",
+            method: "GET",
+            params: {
+              fields: encode(["name", "status", "docstatus", "period_end_date"]),
+              filters: encode([["pos_opening_entry", "=", String(active.name ?? "")], ["docstatus", "!=", 2]]),
+              order_by: "modified desc",
+              limit_page_length: 1
+            }
+          });
+
+          if (!hasError(closingCheck)) {
+            const closingRows = (closingCheck.data as FrappeListResponse<Record<string, unknown>>).data;
+            if (closingRows.length > 0) {
+              continue;
+            }
           }
 
           const profileName = toString(active.pos_profile);
@@ -799,8 +884,8 @@ export const posApi = frappeApi.injectEndpoints({
         method: "POST",
         data: payload
       }),
-      transformResponse: (response: FrappeDocResponse<PosInvoiceDoc>) => response.data,
-      invalidatesTags: ["ItemList"]
+      transformResponse: (response: FrappeDocResponse<Record<string, unknown>>) => mapPosInvoiceDoc(response.data),
+      invalidatesTags: ["ItemList", "Lookups"]
     }),
 
     updatePosInvoice: builder.mutation<PosInvoiceDoc, { name: string; values: PosInvoiceDoc }>({
@@ -809,8 +894,8 @@ export const posApi = frappeApi.injectEndpoints({
         method: "PUT",
         data: values
       }),
-      transformResponse: (response: FrappeDocResponse<PosInvoiceDoc>) => response.data,
-      invalidatesTags: (_result, _error, arg) => ["ItemList", { type: "Item", id: `POS-${arg.name}` }]
+      transformResponse: (response: FrappeDocResponse<Record<string, unknown>>) => mapPosInvoiceDoc(response.data),
+      invalidatesTags: (_result, _error, arg) => ["ItemList", "Lookups", { type: "Item", id: `POS-${arg.name}` }]
     }),
 
     submitPosInvoice: builder.mutation<PosInvoiceDoc, string>({
@@ -820,9 +905,70 @@ export const posApi = frappeApi.injectEndpoints({
         if (typeof result === "object" && result !== null && "error" in result) {
           return { error: toError(result.error) };
         }
-        return { data: result };
+        return { data: mapPosInvoiceDoc(result as Record<string, unknown>) };
       },
-      invalidatesTags: (_result, _error, name) => ["ItemList", { type: "Item", id: `POS-${name}` }]
+      invalidatesTags: (_result, _error, name) => ["ItemList", "Lookups", { type: "Item", id: `POS-${name}` }]
+    }),
+
+    listPosDraftInvoices: builder.query<PosDraftInvoiceLookup[], { openingEntry?: string; userId?: string } | void>({
+      async queryFn(arg, _api, _extra, baseQuery) {
+        const run = (input: QueryArg) => baseQuery(input) as Promise<QueryResult>;
+        const openingEntry = typeof arg === "object" ? arg.openingEntry?.trim() : undefined;
+        const userId = typeof arg === "object" ? arg.userId?.trim() : undefined;
+
+        const filters: unknown[][] = [["docstatus", "=", 0], ["is_pos", "=", 1]];
+        if (openingEntry) {
+          filters.push(["pos_opening_entry", "=", openingEntry]);
+        }
+
+        const result = await run({
+          url: "/resource/Sales Invoice",
+          method: "GET",
+          params: {
+            fields: encode(["name", "customer", "posting_date", "grand_total", "status", "modified", "owner"]),
+            filters: encode(filters),
+            ...(userId ? { or_filters: encode([["owner", "=", userId]]) } : {}),
+            order_by: "modified desc",
+            limit_page_length: 100
+          }
+        });
+
+        if (hasError(result)) {
+          return { error: toError(result.error) };
+        }
+
+        const rows = (result.data as FrappeListResponse<Record<string, unknown>>).data;
+        return {
+          data: rows.map((row) => ({
+            label: String(row.name ?? ""),
+            value: String(row.name ?? ""),
+            customer: toString(row.customer),
+            posting_date: toString(row.posting_date),
+            grand_total: toNumber(row.grand_total),
+            modified: toString(row.modified),
+            status: toString(row.status)
+          }))
+        };
+      },
+      providesTags: ["Lookups"]
+    }),
+
+    getPosInvoice: builder.query<PosInvoiceDoc, string>({
+      async queryFn(name, _api, _extra, baseQuery) {
+        const run = (input: QueryArg) => baseQuery(input) as Promise<QueryResult>;
+        const result = await run({
+          url: `/resource/Sales%20Invoice/${encodeURIComponent(name)}`,
+          method: "GET"
+        });
+
+        if (hasError(result)) {
+          return { error: toError(result.error) };
+        }
+
+        const row = (result.data as FrappeDocResponse<Record<string, unknown>>).data;
+        return { data: mapPosInvoiceDoc(row) };
+      },
+      providesTags: (_result, _error, name) => [{ type: "Item", id: `POS-${name}` }]
     })
   })
 });
@@ -843,5 +989,7 @@ export const {
   useCreatePosClosingEntryMutation,
   useCreatePosInvoiceMutation,
   useUpdatePosInvoiceMutation,
-  useSubmitPosInvoiceMutation
+  useSubmitPosInvoiceMutation,
+  useListPosDraftInvoicesQuery,
+  useLazyGetPosInvoiceQuery
 } = posApi;

@@ -40,12 +40,15 @@ export type PosSession = {
   user?: string;
   status?: string;
   opening_time?: string;
+  closing_time?: string;
   posting_date?: string;
   remarks?: string;
   warehouse?: string;
   default_customer?: string;
   opening_amounts: PosOpeningAmountRow[];
 };
+
+export type PosDiscountMode = "item" | "overall" | "both";
 
 export type PosOpeningEntryPayload = {
   pos_profile: string;
@@ -102,6 +105,9 @@ export type PosCartItem = {
 export type PosTotals = {
   totalItems: number;
   subtotal: number;
+  itemDiscountTotal: number;
+  netSubtotal: number;
+  overallDiscountTotal: number;
   discountTotal: number;
   grandTotal: number;
 };
@@ -119,14 +125,18 @@ export type PosInvoiceDoc = {
   remarks?: string;
   mode_of_payment?: string;
   paid_amount?: number;
+  additional_discount_percentage?: number;
+  apply_discount_on?: string;
   items: Array<{
     item_code: string;
+    item_name?: string;
     qty: number;
     uom?: string;
     rate: number;
     gst_hsn_code?: string;
     discount_percentage?: number;
     discount_amount?: number;
+    barcode?: string;
     warehouse?: string;
   }>;
   payments?: Array<{
@@ -146,4 +156,17 @@ export type PosFormState = {
   paid_amount?: number;
   remarks?: string;
   posting_date: string;
+  discount_enabled: boolean;
+  discount_mode: PosDiscountMode;
+  overall_discount_percentage: number;
+};
+
+export type PosDraftInvoiceLookup = {
+  label: string;
+  value: string;
+  customer?: string;
+  posting_date?: string;
+  grand_total?: number;
+  modified?: string;
+  status?: string;
 };

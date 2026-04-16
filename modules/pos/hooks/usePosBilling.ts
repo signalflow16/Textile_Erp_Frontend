@@ -1,23 +1,34 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { useAppSelector } from "@/core/store/hooks";
+import { useListWarehousesQuery } from "@/modules/buying/api/buyingApi";
 import {
   useCreatePosInvoiceMutation,
   useLazyGetItemStockQtyQuery,
+  useLazyGetPosInvoiceQuery,
   useLazyGetPosItemMetaQuery,
   useLazyGetPosItemSellingRateQuery,
   useLazySearchPosItemsQuery,
+  useListPosDraftInvoicesQuery,
   useListPosPaymentModesQuery,
   useSubmitPosInvoiceMutation,
   useUpdatePosInvoiceMutation
 } from "@/modules/pos/api/posApi";
-import { useListWarehousesQuery } from "@/modules/buying/api/buyingApi";
 import { defaultWalkInCustomer } from "@/modules/pos/hooks/usePosCustomerSearch";
-import type { PosCartItem, PosFormState, PosItemLookup, PosInvoiceDoc, PosSession } from "@/modules/pos/types/pos";
+import type {
+  PosCartItem,
+  PosDiscountMode,
+  PosDraftInvoiceLookup,
+  PosFormState,
+  PosInvoiceDoc,
+  PosItemLookup,
+  PosSession
+} from "@/modules/pos/types/pos";
 import { calcPosTotals } from "@/modules/pos/utils/posCalculations";
 import { toPosInvoicePayload } from "@/modules/pos/utils/posPayloadMapper";
 import { openErpNextPrintPreview } from "@/modules/pos/utils/printBill";
-import { createEmptyPosRow, normalizePosRows, toBillableRows } from "@/modules/pos/utils/rowCompletion";
 import { validatePosBeforeSave, validatePosBeforeSubmit } from "@/modules/pos/utils/posValidation";
+import { createEmptyPosRow, normalizePosRows, toBillableRows } from "@/modules/pos/utils/rowCompletion";
 import { createOrUpdatePosBillDraft, submitPosBill } from "@/modules/pos/utils/posSessionService";
 
 const today = () => new Date().toISOString().slice(0, 10);
@@ -30,7 +41,10 @@ const createDefaultForm = (session?: PosSession | null): PosFormState => ({
   paid_amount: undefined,
   mode_of_payment: undefined,
   remarks: undefined,
-  set_warehouse: session?.warehouse
+  set_warehouse: session?.warehouse,
+  discount_enabled: false,
+  discount_mode: "item",
+  overall_discount_percentage: 0
 });
 
 const toPositiveNumber = (value: number, fallback = 0) => {
@@ -47,7 +61,7 @@ const buildNewCartItem = (item: PosItemLookup, warehouse?: string): PosCartItem 
   rowId: createEmptyPosRow().rowId,
   item_code: item.value,
   item_name: item.item_name ?? item.label,
-  hs_code: item.hs_code,
+  hs_code: item.hs_code ?? item.value,
   uom: item.stock_uom ?? "Nos",
   qty: 1,
   rate: item.standard_rate ?? 0,
@@ -61,11 +75,65 @@ const buildNewCartItem = (item: PosItemLookup, warehouse?: string): PosCartItem 
   design: item.design
 });
 
+const hasItemLevelDiscount = (rows: PosCartItem[]) =>
+  rows.some((row) => row.discount_percentage > 0 || row.discount_amount > 0);
+
+const resolveDiscountMode = (hasItemDiscount: boolean, hasOverallDiscount: boolean): PosDiscountMode => {
+  if (hasItemDiscount && hasOverallDiscount) {
+    return "both";
+  }
+  if (hasOverallDiscount) {
+    return "overall";
+  }
+  return "item";
+};
+
+const mapInvoiceToCartItems = (doc: PosInvoiceDoc): PosCartItem[] =>
+  doc.items.map((row) => ({
+    rowId: createEmptyPosRow().rowId,
+    item_code: row.item_code,
+    item_name: row.item_name ?? row.item_code,
+    hs_code: row.gst_hsn_code ?? row.item_code,
+    uom: row.uom ?? "Nos",
+    qty: row.qty,
+    rate: row.rate,
+    discount_percentage: row.discount_percentage ?? 0,
+    discount_amount: row.discount_amount ?? 0,
+    warehouse: row.warehouse,
+    barcode: row.barcode
+  }));
+
+const mapInvoiceToForm = (doc: PosInvoiceDoc, session?: PosSession | null): PosFormState => {
+  const hasOverallDiscount = (doc.additional_discount_percentage ?? 0) > 0;
+  const itemRows = mapInvoiceToCartItems(doc);
+  return {
+    customer: doc.customer || session?.default_customer || defaultWalkInCustomer,
+    pos_profile: doc.pos_profile ?? session?.pos_profile,
+    pos_opening_entry: doc.pos_opening_entry ?? session?.name,
+    posting_date: doc.posting_date || today(),
+    paid_amount: doc.paid_amount,
+    mode_of_payment: doc.mode_of_payment ?? doc.payments?.[0]?.mode_of_payment,
+    remarks: doc.remarks,
+    set_warehouse: doc.set_warehouse ?? session?.warehouse,
+    discount_enabled: hasOverallDiscount || hasItemLevelDiscount(itemRows),
+    discount_mode: resolveDiscountMode(hasItemLevelDiscount(itemRows), hasOverallDiscount),
+    overall_discount_percentage: doc.additional_discount_percentage ?? 0
+  };
+};
+
 export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
+  const me = useAppSelector((state) => state.auth.me);
+  const userId = useMemo(
+    () => (typeof me?.email === "string" && me.email ? me.email : (typeof me?.user_id === "string" ? me.user_id : undefined)),
+    [me?.email, me?.user_id]
+  );
+
   const [form, setForm] = useState<PosFormState>(() => createDefaultForm(session));
   const [cartItems, setCartItems] = useState<PosCartItem[]>([createEmptyPosRow()]);
   const [draftDocName, setDraftDocName] = useState<string | null>(null);
   const [lastSubmittedInvoiceName, setLastSubmittedInvoiceName] = useState<string | null>(null);
+  const [isLoadingDraft, setIsLoadingDraft] = useState(false);
+  const [focusSequence, setFocusSequence] = useState(0);
 
   useEffect(() => {
     setForm((prev) => ({
@@ -84,12 +152,29 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
   const [fetchPosItemMeta] = useLazyGetPosItemMetaQuery();
   const [fetchPosItemSellingRate] = useLazyGetPosItemSellingRateQuery();
   const [searchPosItems] = useLazySearchPosItemsQuery();
+  const [fetchPosInvoice] = useLazyGetPosInvoiceQuery();
 
   const paymentModesQuery = useListPosPaymentModesQuery();
   const warehousesQuery = useListWarehousesQuery();
+  const draftListQuery = useListPosDraftInvoicesQuery(
+    session ? { openingEntry: session.name, userId } : undefined,
+    { skip: !session }
+  );
+
+  const itemDiscountEnabled = form.discount_enabled && (form.discount_mode === "item" || form.discount_mode === "both");
+  const overallDiscountEnabled =
+    form.discount_enabled && (form.discount_mode === "overall" || form.discount_mode === "both");
 
   const billableRows = useMemo(() => toBillableRows(cartItems), [cartItems]);
-  const totals = useMemo(() => calcPosTotals(billableRows), [billableRows]);
+  const totals = useMemo(
+    () =>
+      calcPosTotals(billableRows, {
+        itemDiscountEnabled,
+        overallDiscountEnabled,
+        overallDiscountPercentage: form.overall_discount_percentage
+      }),
+    [billableRows, form.overall_discount_percentage, itemDiscountEnabled, overallDiscountEnabled]
+  );
   const paymentModes = useMemo(() => {
     if (paymentModesQuery.data?.length) {
       return paymentModesQuery.data;
@@ -104,6 +189,9 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
 
   const paidAmount = typeof form.paid_amount === "number" ? form.paid_amount : totals.grandTotal;
   const balanceAmount = Number((paidAmount - totals.grandTotal).toFixed(2));
+  const draftInvoices = draftListQuery.data ?? [];
+  const activeBillName = lastSubmittedInvoiceName ?? draftDocName;
+  const activeBillStatus = lastSubmittedInvoiceName ? "Submitted" : draftDocName ? "Draft" : undefined;
 
   const updateForm = useCallback((patch: Partial<PosFormState>) => {
     setForm((prev) => ({ ...prev, ...patch }));
@@ -112,6 +200,39 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
   const syncRows = useCallback((updater: (rows: PosCartItem[]) => PosCartItem[]) => {
     setCartItems((prev) => normalizePosRows(updater(prev)));
   }, []);
+
+  const zeroItemDiscounts = useCallback(() => {
+    syncRows((prev) =>
+      prev.map((row) => ({
+        ...row,
+        discount_percentage: 0,
+        discount_amount: 0
+      }))
+    );
+  }, [syncRows]);
+
+  const updateDiscountConfig = useCallback((patch: Partial<Pick<PosFormState, "discount_enabled" | "discount_mode" | "overall_discount_percentage">>) => {
+    setForm((prev) => {
+      const next = { ...prev, ...patch };
+
+      if (!next.discount_enabled) {
+        next.discount_mode = "item";
+        next.overall_discount_percentage = 0;
+      }
+
+      if (next.discount_mode === "item") {
+        next.overall_discount_percentage = 0;
+      }
+
+      return next;
+    });
+
+    const nextEnabled = patch.discount_enabled ?? form.discount_enabled;
+    const nextMode = patch.discount_mode ?? form.discount_mode;
+    if (!nextEnabled || nextMode === "overall") {
+      zeroItemDiscounts();
+    }
+  }, [form.discount_enabled, form.discount_mode, zeroItemDiscounts]);
 
   const updateStockForRow = useCallback(async (itemCode: string, warehouse?: string) => {
     if (!warehouse) {
@@ -174,7 +295,7 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
     ]);
 
     const resolvedItemName = item.item_name ?? detail.item_name ?? item.label;
-    const resolvedHsCode = item.hs_code ?? detail.hs_code;
+    const resolvedHsCode = item.hs_code ?? detail.hs_code ?? item.value;
     const resolvedBarcode = item.barcode ?? detail.barcode;
     const resolvedUom = item.stock_uom ?? detail.stock_uom ?? "Nos";
     const resolvedRate =
@@ -182,17 +303,38 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
       (typeof detail.standard_rate === "number" && detail.standard_rate > 0 ? detail.standard_rate : undefined) ??
       (typeof sellingRate === "number" && sellingRate > 0 ? sellingRate : undefined);
 
-    syncRows((prev) =>
-      {
-        const target = prev.find((row) => row.rowId === rowId);
-        const targetQty = target && target.qty > 0 ? target.qty : 1;
+    syncRows((prev) => {
+      const target = prev.find((row) => row.rowId === rowId);
+      const targetQty = target && target.qty > 0 ? target.qty : 1;
 
-        if (options?.incrementQtyOnly) {
-          const targetSameItem =
-            target && target.item_code && toLookupKey(target.item_code) === toLookupKey(item.value) ? target : undefined;
-          if (targetSameItem) {
-            return prev.map((row) =>
-              row.rowId === rowId
+      if (options?.incrementQtyOnly) {
+        const targetSameItem =
+          target && target.item_code && toLookupKey(target.item_code) === toLookupKey(item.value) ? target : undefined;
+        if (targetSameItem) {
+          return prev.map((row) =>
+            row.rowId === rowId
+              ? {
+                  ...row,
+                  item_name: row.item_name ?? resolvedItemName,
+                  hs_code: row.hs_code ?? resolvedHsCode,
+                  barcode: row.barcode ?? resolvedBarcode,
+                  uom: row.uom || resolvedUom,
+                  rate: row.rate > 0 ? row.rate : (resolvedRate ?? row.rate),
+                  qty: (row.qty > 0 ? row.qty : 0) + 1,
+                  available_qty: stockQty
+                }
+              : row
+          );
+        }
+
+        const duplicate = prev.find(
+          (row) => row.rowId !== rowId && row.item_code && toLookupKey(row.item_code) === toLookupKey(item.value)
+        );
+        if (duplicate) {
+          return prev
+            .filter((row) => row.rowId !== rowId)
+            .map((row) =>
+              row.rowId === duplicate.rowId
                 ? {
                     ...row,
                     item_name: row.item_name ?? resolvedItemName,
@@ -205,49 +347,26 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
                   }
                 : row
             );
-          }
-
-          const duplicate = prev.find(
-            (row) => row.rowId !== rowId && row.item_code && toLookupKey(row.item_code) === toLookupKey(item.value)
-          );
-          if (duplicate) {
-            return prev
-              .filter((row) => row.rowId !== rowId)
-              .map((row) =>
-                row.rowId === duplicate.rowId
-                  ? {
-                      ...row,
-                      item_name: row.item_name ?? resolvedItemName,
-                      hs_code: row.hs_code ?? resolvedHsCode,
-                      barcode: row.barcode ?? resolvedBarcode,
-                      uom: row.uom || resolvedUom,
-                      rate: row.rate > 0 ? row.rate : (resolvedRate ?? row.rate),
-                      qty: (row.qty > 0 ? row.qty : 0) + 1,
-                      available_qty: stockQty
-                    }
-                  : row
-              );
-          }
         }
-
-        return prev.map((row) =>
-          row.rowId === rowId
-            ? {
-                ...row,
-                ...buildNewCartItem(item, warehouse),
-                rowId,
-                qty: row.qty > 0 ? row.qty : targetQty,
-                item_name: resolvedItemName ?? row.item_name,
-                hs_code: resolvedHsCode ?? row.hs_code,
-                barcode: resolvedBarcode ?? row.barcode,
-                uom: resolvedUom || row.uom,
-                rate: resolvedRate ?? row.rate,
-                available_qty: stockQty
-              }
-            : row
-        );
       }
-    );
+
+      return prev.map((row) =>
+        row.rowId === rowId
+          ? {
+              ...row,
+              ...buildNewCartItem(item, warehouse),
+              rowId,
+              qty: row.qty > 0 ? row.qty : targetQty,
+              item_name: resolvedItemName ?? row.item_name,
+              hs_code: resolvedHsCode ?? row.hs_code,
+              barcode: resolvedBarcode ?? row.barcode,
+              uom: resolvedUom || row.uom,
+              rate: resolvedRate ?? row.rate,
+              available_qty: stockQty
+            }
+          : row
+      );
+    });
   }, [fetchPosItemSellingRate, form.set_warehouse, resolveItemMeta, syncRows, updateStockForRow]);
 
   const addItem = useCallback(async (item: PosItemLookup) => {
@@ -290,7 +409,7 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
           standard_rate: detail.standard_rate,
           barcode: detail.barcode,
           variant_of: detail.variant_of,
-          hs_code: detail.hs_code
+          hs_code: detail.hs_code ?? detail.value
         }
       : null;
     const matched = detailMapped ?? (await lookupItemByCode(itemCode));
@@ -300,7 +419,7 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
 
     await applyItemToRow(rowId, matched);
     return true;
-  }, [applyItemToRow, lookupItemByCode]);
+  }, [applyItemToRow, fetchPosItemMeta, lookupItemByCode]);
 
   const applyBarcodeToRow = useCallback(async (rowId: string, barcode: string) => {
     const token = barcode.trim();
@@ -333,6 +452,7 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
         return {
           ...row,
           ...patch,
+          hs_code: patch.hs_code === undefined ? row.hs_code : patch.hs_code || row.item_code,
           qty: nextQty,
           rate: nextRate,
           discount_percentage:
@@ -359,7 +479,16 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
     setCartItems([createEmptyPosRow()]);
     setDraftDocName(null);
     setLastSubmittedInvoiceName(null);
+    setFocusSequence((prev) => prev + 1);
   }, []);
+
+  const resetForNextBill = useCallback(() => {
+    setForm(createDefaultForm(session));
+    setCartItems([createEmptyPosRow()]);
+    setDraftDocName(null);
+    setLastSubmittedInvoiceName(null);
+    setFocusSequence((prev) => prev + 1);
+  }, [session]);
 
   const toPayload = useCallback(() => toPosInvoicePayload(form, billableRows), [billableRows, form]);
 
@@ -377,6 +506,7 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
     );
     if (saved.name) {
       setDraftDocName(saved.name);
+      setLastSubmittedInvoiceName(null);
     }
     return saved;
   }, [billableRows, createPosInvoice, draftDocName, form, toPayload, updatePosInvoice]);
@@ -399,12 +529,36 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
     return submitted;
   }, [billableRows, draftDocName, form, saveDraft, submitPosInvoice]);
 
-  const resetForNextBill = useCallback(() => {
-    setForm(createDefaultForm(session));
-    setCartItems([createEmptyPosRow()]);
-    setDraftDocName(null);
-    setLastSubmittedInvoiceName(null);
-  }, [session]);
+  const loadDraft = useCallback(async (name: string) => {
+    setIsLoadingDraft(true);
+    try {
+      const doc = await fetchPosInvoice(name, true).unwrap();
+      setForm(mapInvoiceToForm(doc, session));
+      setCartItems(normalizePosRows(mapInvoiceToCartItems(doc)));
+      setDraftDocName(doc.name ?? name);
+      setLastSubmittedInvoiceName(null);
+    } finally {
+      setIsLoadingDraft(false);
+    }
+  }, [fetchPosInvoice, session]);
+
+  const printBill = useCallback(() => {
+    const docName = lastSubmittedInvoiceName ?? draftDocName;
+    if (!docName) {
+      return false;
+    }
+    return openErpNextPrintPreview("Sales Invoice", docName);
+  }, [draftDocName, lastSubmittedInvoiceName]);
+
+  const saveAndPrint = useCallback(async (): Promise<PosInvoiceDoc> => {
+    const submitted = await saveAndSubmit();
+    const opened = submitted.name ? openErpNextPrintPreview("Sales Invoice", submitted.name) : false;
+    if (!opened) {
+      throw new Error("Print preview was blocked. Allow pop-ups to continue.");
+    }
+    resetForNextBill();
+    return submitted;
+  }, [resetForNextBill, saveAndSubmit]);
 
   return {
     form,
@@ -419,8 +573,10 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
     balanceAmount,
     isSaving: createState.isLoading || updateState.isLoading,
     isSubmitting: submitState.isLoading,
+    isLoadingDraft,
     isPaymentModesLoading: paymentModesQuery.isLoading,
     isWarehousesLoading: warehousesQuery.isLoading,
+    isLoadingDraftList: draftListQuery.isLoading || draftListQuery.isFetching,
     updateForm,
     setWarehouse,
     addItem,
@@ -432,14 +588,16 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
     clearCart,
     saveDraft,
     saveAndSubmit,
+    saveAndPrint,
     resetForNextBill,
-    printBill: () => {
-      const docName = lastSubmittedInvoiceName ?? draftDocName;
-      if (!docName) {
-        return false;
-      }
-      openErpNextPrintPreview("Sales Invoice", docName);
-      return true;
-    }
+    printBill,
+    updateDiscountConfig,
+    draftInvoices,
+    loadDraft,
+    focusSequence,
+    itemDiscountEnabled,
+    overallDiscountEnabled,
+    activeBillName,
+    activeBillStatus
   };
 };

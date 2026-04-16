@@ -22,8 +22,11 @@ export const buildErpNextPrintPreviewUrl = ({
 export const openErpNextPrintPreview = (doctype: string, name: string) => {
   const url = buildErpNextPrintPreviewUrl({ doctype, name });
   if (typeof window !== "undefined") {
-    window.open(url, "_blank", "noopener,noreferrer");
+    const previewWindow = window.open(url, "_blank", "noopener,noreferrer");
+    return Boolean(previewWindow);
   }
+
+  return false;
 };
 
 export const openErpnextPrintPreview = openErpNextPrintPreview;

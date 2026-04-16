@@ -30,7 +30,7 @@ type ClosingFormValues = {
 };
 
 export function PosClosingEntryPage() {
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const router = useRouter();
   const [form] = Form.useForm<ClosingFormValues>();
   const active = useActivePosSession();
@@ -103,28 +103,47 @@ export function PosClosingEntryPage() {
   ];
 
   const onSubmit = async () => {
-    if (!active.session) {
+    const session = active.session;
+    if (!session) {
       message.warning("No active POS session to close.");
       return;
     }
 
     try {
       const values = await form.validateFields();
-      await createPosClosingEntry(
-        {
-          pos_opening_entry: active.session.name,
-          actual_amounts: calculatedRows.map((row) => ({
-            mode_of_payment: row.mode_of_payment,
-            amount: row.actual_amount
-          })),
-          remarks: values.remarks
-        },
-        closing.closeSession
-      );
+      await new Promise<void>((resolve, reject) => {
+        modal.confirm({
+          title: "Close POS session?",
+          content: "You will need a new opening entry before billing again.",
+          okText: "Close Session",
+          onOk: async () => {
+            try {
+              await createPosClosingEntry(
+                {
+                  pos_opening_entry: session.name,
+                  actual_amounts: calculatedRows.map((row) => ({
+                    mode_of_payment: row.mode_of_payment,
+                    amount: row.actual_amount
+                  })),
+                  remarks: values.remarks
+                },
+                closing.closeSession
+              );
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          },
+          onCancel: () => reject(new Error("POS closing cancelled."))
+        });
+      });
 
       message.success("POS session closed successfully.");
       router.replace("/pos/opening");
     } catch (error) {
+      if (error instanceof Error && error.message === "POS closing cancelled.") {
+        return;
+      }
       message.error(extractApiErrorMessage(error, "Unable to close POS session."));
     }
   };
@@ -155,6 +174,7 @@ export function PosClosingEntryPage() {
       <Card title="Session Summary" loading={summaryQuery.isLoading}>
         <Descriptions column={2} size="small">
           <Descriptions.Item label="POS Profile">{summary?.pos_profile ?? active.session.pos_profile}</Descriptions.Item>
+          <Descriptions.Item label="Status">{active.session.status ?? "Open"}</Descriptions.Item>
           <Descriptions.Item label="Company">{summary?.company ?? active.session.company ?? "-"}</Descriptions.Item>
           <Descriptions.Item label="Opening Date/Time">{summary?.opening_time ?? active.session.opening_time ?? "-"}</Descriptions.Item>
           <Descriptions.Item label="Bills">{summary?.invoice_count ?? 0}</Descriptions.Item>
