@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Alert, Button, DatePicker, Drawer, Input, Skeleton, Space, Table, Tag, Typography } from "antd";
+import { ReloadOutlined } from "@ant-design/icons";
 import type { ColumnsType } from "antd/es/table";
 import type { Dayjs } from "dayjs";
 
@@ -17,6 +18,7 @@ import {
   selectStockState
 } from "@/modules/stock/store/stockSlice";
 import { useAppDispatch, useAppSelector } from "@/core/store/hooks";
+import { getStatusColor, getStatusLabel } from "@/core/utils/status";
 import type { StockEntryListRow } from "@/modules/stock/types";
 
 const { RangePicker } = DatePicker;
@@ -29,18 +31,6 @@ const currencyFormatter = new Intl.NumberFormat("en-IN", {
   currency: "INR",
   maximumFractionDigits: 0
 });
-
-const docstatusLabel = (docstatus?: 0 | 1 | 2 | null) => {
-  if (docstatus === 1) {
-    return { color: "success" as const, text: "Submitted" };
-  }
-
-  if (docstatus === 2) {
-    return { color: "default" as const, text: "Cancelled" };
-  }
-
-  return { color: "warning" as const, text: "Draft" };
-};
 
 export function StockEntryListPage() {
   const dispatch = useAppDispatch();
@@ -95,8 +85,8 @@ export function StockEntryListPage() {
           <Space direction="vertical" size={2}>
             <Text strong>{value}</Text>
             <Text type="secondary">{record.stock_entry_type || record.purpose || "Stock Entry"}</Text>
-            <Tag bordered={false} color={docstatusLabel(record.docstatus).color}>
-              {docstatusLabel(record.docstatus).text}
+            <Tag bordered={false} color={getStatusColor({ docstatus: record.docstatus })}>
+              {getStatusLabel({ docstatus: record.docstatus })}
             </Tag>
           </Space>
         )
@@ -160,6 +150,23 @@ export function StockEntryListPage() {
           onChange={(event) => setSearch(event.target.value)}
         />
         <RangePicker value={dates} onChange={(value) => setDates(value)} />
+        <Button
+          icon={<ReloadOutlined />}
+          onClick={() =>
+            void dispatch(
+              fetchStockEntries({
+                search: deferredSearch,
+                fromDate: dates?.[0]?.format("YYYY-MM-DD"),
+                toDate: dates?.[1]?.format("YYYY-MM-DD"),
+                page,
+                pageSize
+              })
+            )
+          }
+          loading={stockState.stockEntriesStatus === "loading"}
+        >
+          Refresh
+        </Button>
         <Button type="primary">
           <Link href="/stock/stock-entry/create">New Stock Entry</Link>
         </Button>
@@ -215,7 +222,7 @@ export function StockEntryListPage() {
               </div>
               <div>
                 <Text type="secondary">Status</Text>
-                <div>{docstatusLabel(detail.docstatus).text}</div>
+                <div>{getStatusLabel({ docstatus: detail.docstatus })}</div>
               </div>
             </div>
             <Table

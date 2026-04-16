@@ -94,6 +94,8 @@ export type DocumentRecord = {
   buying_price_list?: string | null;
   currency?: string | null;
   docstatus?: DocumentStatus | null;
+  status?: string | null;
+  workflow_state?: string | null;
   remarks?: string | null;
   items?: DocumentLineItem[];
   taxes?: DocumentTaxLine[];
@@ -113,6 +115,8 @@ export type DocumentListRow = {
   posting_date?: string | null;
   posting_time?: string | null;
   docstatus?: DocumentStatus | null;
+  status?: string | null;
+  workflow_state?: string | null;
   grand_total?: number | null;
   currency?: string | null;
   set_warehouse?: string | null;
