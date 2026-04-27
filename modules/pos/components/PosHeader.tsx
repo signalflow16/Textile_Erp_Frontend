@@ -1,6 +1,6 @@
 "use client";
 
-import { PrinterOutlined } from "@ant-design/icons";
+import { CheckOutlined } from "@ant-design/icons";
 import { Button, Space, Tag, Typography } from "antd";
 
 import { SaveDraftButton } from "@/modules/buying/components/common/SaveDraftButton";
@@ -41,12 +41,12 @@ export function PosHeader({
         <SaveDraftButton loading={isSaving} disabled={isSubmitting} onClick={onSaveDraft} />
         <Button
           type="primary"
-          icon={<PrinterOutlined />}
+          icon={<CheckOutlined />}
           loading={isSubmitting}
           disabled={isSaving}
           onClick={onSavePrint}
         >
-          Save & Print
+          Submit Bill
         </Button>
       </Space>
     </div>

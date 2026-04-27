@@ -3,13 +3,13 @@
 import { useMemo } from "react";
 import { App, Form, Input, InputNumber, Modal, Select } from "antd";
 
+import { useAppSelector } from "@/core/store/hooks";
 import { extractApiErrorMessage } from "@/lib/api-errors";
 import { usePosOpeningEntry } from "@/modules/pos/hooks/usePosOpeningEntry";
 import { createPosOpeningEntry } from "@/modules/pos/utils/posSessionService";
 
 type OpeningFormValues = {
   pos_profile?: string;
-  company?: string;
   opening_cash?: number;
   remarks?: string;
 };
@@ -26,7 +26,12 @@ export function PosOpeningEntryModal({
   const { message } = App.useApp();
   const [form] = Form.useForm<OpeningFormValues>();
   const opening = usePosOpeningEntry();
+  const me = useAppSelector((state) => state.auth.me);
   const openingTimestamp = useMemo(() => new Date().toLocaleString(), [open]);
+  const userId = useMemo(
+    () => (typeof me?.user_id === "string" && me.user_id ? me.user_id : (typeof me?.email === "string" ? me.email : undefined)),
+    [me?.email, me?.user_id]
+  );
 
   const selectedProfile = Form.useWatch("pos_profile", form);
   const profileOptions = opening.profiles;
@@ -42,11 +47,16 @@ export function PosOpeningEntryModal({
         message.warning("Select POS Profile.");
         return;
       }
+      if (!userId) {
+        message.warning("Unable to detect the logged-in cashier. Please sign in again and retry.");
+        return;
+      }
 
       await createPosOpeningEntry(() =>
         opening.startSession({
           pos_profile: values.pos_profile!,
-          company: values.company || selectedProfileMeta?.company,
+          company: selectedProfileMeta?.company,
+          user: userId,
           opening_cash: Number(values.opening_cash ?? 0),
           remarks: values.remarks
         })
@@ -70,7 +80,7 @@ export function PosOpeningEntryModal({
       }}
       okText="Start Session"
       confirmLoading={opening.isStarting}
-      destroyOnClose
+      destroyOnHidden
       maskClosable={false}
     >
       <Form<OpeningFormValues> layout="vertical" form={form} initialValues={{ opening_cash: 0 }} preserve={false}>
@@ -90,15 +100,11 @@ export function PosOpeningEntryModal({
               loading={opening.isProfilesLoading}
               options={profileOptions}
               placeholder="Select POS Profile"
-              onChange={(value) => {
-                const profile = profileOptions.find((row) => row.value === value);
-                form.setFieldValue("company", profile?.company);
-              }}
             />
           </Form.Item>
 
-          <Form.Item label="Company" name="company">
-            <Input placeholder="Auto from profile" />
+          <Form.Item label="Company">
+            <Input value={selectedProfileMeta?.company ?? ""} placeholder="Auto from profile" readOnly />
           </Form.Item>
 
           <Form.Item

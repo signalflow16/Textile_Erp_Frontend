@@ -5,6 +5,7 @@ import Link from "next/link";
 import { App, Button, Card, Form, Input, InputNumber, Select, Space, Typography } from "antd";
 import { useRouter } from "next/navigation";
 
+import { useAppSelector } from "@/core/store/hooks";
 import { extractApiErrorMessage } from "@/lib/api-errors";
 import { useActivePosSession } from "@/modules/pos/hooks/useActivePosSession";
 import { usePosOpeningEntry } from "@/modules/pos/hooks/usePosOpeningEntry";
@@ -14,7 +15,6 @@ const { Text } = Typography;
 
 type OpeningFormValues = {
   pos_profile?: string;
-  company?: string;
   opening_cash?: number;
   remarks?: string;
 };
@@ -23,9 +23,14 @@ export function PosOpeningEntryPage() {
   const { message } = App.useApp();
   const router = useRouter();
   const [form] = Form.useForm<OpeningFormValues>();
+  const me = useAppSelector((state) => state.auth.me);
   const activeSession = useActivePosSession();
   const opening = usePosOpeningEntry();
   const openingTimestamp = useMemo(() => new Date().toLocaleString(), []);
+  const userId = useMemo(
+    () => (typeof me?.user_id === "string" && me.user_id ? me.user_id : (typeof me?.email === "string" ? me.email : undefined)),
+    [me?.email, me?.user_id]
+  );
 
   const selectedProfile = Form.useWatch("pos_profile", form);
   const profileOptions = opening.profiles;
@@ -41,12 +46,17 @@ export function PosOpeningEntryPage() {
         message.warning("Select POS Profile.");
         return;
       }
+      if (!userId) {
+        message.warning("Unable to detect the logged-in cashier. Please sign in again and retry.");
+        return;
+      }
       const posProfile = values.pos_profile;
 
       await createPosOpeningEntry(() =>
         opening.startSession({
           pos_profile: posProfile,
-          company: values.company || selectedProfileMeta?.company,
+          company: selectedProfileMeta?.company,
+          user: userId,
           opening_cash: Number(values.opening_cash ?? 0),
           remarks: values.remarks
         })
@@ -102,15 +112,11 @@ export function PosOpeningEntryPage() {
                 loading={opening.isProfilesLoading}
                 options={profileOptions}
                 placeholder="Select POS Profile"
-                onChange={(value) => {
-                  const profile = profileOptions.find((row) => row.value === value);
-                  form.setFieldValue("company", profile?.company);
-                }}
               />
             </Form.Item>
 
-            <Form.Item label="Company" name="company">
-              <Input placeholder="Auto from profile" />
+            <Form.Item label="Company">
+              <Input value={selectedProfileMeta?.company ?? ""} placeholder="Auto from profile" readOnly />
             </Form.Item>
 
             <Form.Item

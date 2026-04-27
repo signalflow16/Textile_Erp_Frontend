@@ -9,6 +9,7 @@ import {
   useLazyGetPosItemMetaQuery,
   useLazyGetPosItemSellingRateQuery,
   useLazySearchPosItemsQuery,
+  useListPosCustomersQuery,
   useListPosDraftInvoicesQuery,
   useListPosPaymentModesQuery,
   useSubmitPosInvoiceMutation,
@@ -124,7 +125,7 @@ const mapInvoiceToForm = (doc: PosInvoiceDoc, session?: PosSession | null): PosF
 export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
   const me = useAppSelector((state) => state.auth.me);
   const userId = useMemo(
-    () => (typeof me?.email === "string" && me.email ? me.email : (typeof me?.user_id === "string" ? me.user_id : undefined)),
+    () => (typeof me?.user_id === "string" && me.user_id ? me.user_id : (typeof me?.email === "string" ? me.email : undefined)),
     [me?.email, me?.user_id]
   );
 
@@ -155,6 +156,7 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
   const [fetchPosInvoice] = useLazyGetPosInvoiceQuery();
 
   const paymentModesQuery = useListPosPaymentModesQuery();
+  const customersQuery = useListPosCustomersQuery();
   const warehousesQuery = useListWarehousesQuery();
   const draftListQuery = useListPosDraftInvoicesQuery(
     session ? { openingEntry: session.name, userId } : undefined,
@@ -498,6 +500,12 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
       throw new Error(validationError);
     }
 
+    const customer = form.customer?.trim();
+    const customerOptions = customersQuery.data ?? [];
+    if (!customer || !customerOptions.some((entry) => entry.value === customer)) {
+      throw new Error("Select a valid customer before saving the bill.");
+    }
+
     const payload = toPayload();
     const saved = await createOrUpdatePosBillDraft(() =>
       draftDocName
@@ -509,7 +517,7 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
       setLastSubmittedInvoiceName(null);
     }
     return saved;
-  }, [billableRows, createPosInvoice, draftDocName, form, toPayload, updatePosInvoice]);
+  }, [billableRows, createPosInvoice, customersQuery.data, draftDocName, form, toPayload, updatePosInvoice]);
 
   const saveAndSubmit = useCallback(async (): Promise<PosInvoiceDoc> => {
     const validationError = validatePosBeforeSubmit(form, billableRows);
@@ -552,13 +560,8 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
 
   const saveAndPrint = useCallback(async (): Promise<PosInvoiceDoc> => {
     const submitted = await saveAndSubmit();
-    const opened = submitted.name ? openErpNextPrintPreview("Sales Invoice", submitted.name) : false;
-    if (!opened) {
-      throw new Error("Print preview was blocked. Allow pop-ups to continue.");
-    }
-    resetForNextBill();
     return submitted;
-  }, [resetForNextBill, saveAndSubmit]);
+  }, [saveAndSubmit]);
 
   return {
     form,

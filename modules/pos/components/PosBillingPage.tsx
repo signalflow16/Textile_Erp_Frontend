@@ -44,9 +44,9 @@ export function PosBillingPage({
   const handleSaveAndPrint = useCallback(async () => {
     try {
       const invoice = await billing.saveAndPrint();
-      message.success(`Bill saved and print preview opened${invoice.name ? `: ${invoice.name}` : "."}`);
+      message.success(`Bill submitted${invoice.name ? `: ${invoice.name}` : "."}`);
     } catch (error) {
-      message.error(extractApiErrorMessage(error, "Unable to save and print bill."));
+      message.error(extractApiErrorMessage(error, "Unable to submit bill."));
     }
   }, [billing, message]);
 

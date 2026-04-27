@@ -198,18 +198,16 @@ export function PosClosingEntryPage() {
           <div className="pos-payment-grid">
             {modeRows.map((row, index) => (
               <Form.Item key={row.mode_of_payment} label={`Actual ${row.mode_of_payment}`}>
-                <Space.Compact block>
-                  <Form.Item name={["actuals", index, "mode_of_payment"]} noStyle>
-                    <Input readOnly style={{ width: "48%" }} />
-                  </Form.Item>
-                  <Form.Item
-                    name={["actuals", index, "amount"]}
-                    noStyle
-                    rules={[{ required: true, message: "Enter amount." }]}
-                  >
-                    <InputNumber min={0} precision={2} style={{ width: "52%" }} />
-                  </Form.Item>
-                </Space.Compact>
+                <Form.Item name={["actuals", index, "mode_of_payment"]} hidden>
+                  <Input />
+                </Form.Item>
+                <Form.Item
+                  name={["actuals", index, "amount"]}
+                  noStyle
+                  rules={[{ required: true, message: "Enter amount." }]}
+                >
+                  <InputNumber min={0} precision={2} style={{ width: "100%" }} />
+                </Form.Item>
               </Form.Item>
             ))}
             <Form.Item label="Remarks" name="remarks">
@@ -227,6 +225,7 @@ export function PosClosingEntryPage() {
         />
 
         <Space style={{ marginTop: 12 }} direction="vertical">
+          <Text type="secondary">Expected closing cash = Opening Amount + submitted cash sales for this session.</Text>
           <Text>Expected Amount: <strong>{totalExpected.toFixed(2)}</strong></Text>
           <Text>Entered Closing Amount: <strong>{totalActual.toFixed(2)}</strong></Text>
           <Text>

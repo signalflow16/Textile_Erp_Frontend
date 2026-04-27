@@ -95,7 +95,7 @@ export function SellingItemRowsEditor({
                       </Col>
                       <Col xs={12} md={4}>
                         <Form.Item {...fieldProps} label="Amount" name={[field.name, "amount"]}>
-                          <InputNumber min={0} precision={2} style={{ width: "100%" }} />
+                          <InputNumber min={0} precision={2} style={{ width: "100%" }} disabled />
                         </Form.Item>
                       </Col>
                     </>

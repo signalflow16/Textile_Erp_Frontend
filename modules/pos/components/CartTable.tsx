@@ -230,20 +230,22 @@ export function CartTable({
           key: "discount_percentage",
           width: 140,
           render: (_value: unknown, row: PosCartItem) => (
-            <InputNumber
-              min={0}
-              max={100}
-              precision={2}
-              value={row.discount_percentage}
-              style={{ width: "100%" }}
-              addonAfter="%"
-              onChange={(value) =>
-                onChangeRow(row.rowId, {
-                  discount_percentage: Number(value ?? 0),
-                  discount_amount: 0
-                })
-              }
-            />
+            <Space.Compact style={{ width: "100%" }}>
+              <InputNumber
+                min={0}
+                max={100}
+                precision={2}
+                value={row.discount_percentage}
+                style={{ width: "calc(100% - 40px)" }}
+                onChange={(value) =>
+                  onChangeRow(row.rowId, {
+                    discount_percentage: Number(value ?? 0),
+                    discount_amount: 0
+                  })
+                }
+              />
+              <Input value="%" readOnly tabIndex={-1} style={{ width: 40, textAlign: "center" }} />
+            </Space.Compact>
           )
         }] satisfies ColumnsType<PosCartItem>
       : []),

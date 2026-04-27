@@ -28,6 +28,15 @@ type QueryRunner = (arg: QueryArg) => Promise<QueryResult>;
 
 const encode = (value: unknown) => JSON.stringify(value);
 const hasError = (result: QueryResult): result is { error: FrappeApiError } => "error" in result;
+const isDisallowedListFilterError = (error: FrappeApiError | unknown, fieldname: string) => {
+  const payload = error && typeof error === "object" && "data" in error ? (error as { data?: unknown }).data : undefined;
+  const message = typeof payload === "string"
+    ? payload
+    : payload && typeof payload === "object" && "message" in payload && typeof (payload as { message?: unknown }).message === "string"
+      ? String((payload as { message?: unknown }).message)
+      : "";
+  return message.includes("Field not permitted in query") && message.includes(fieldname);
+};
 
 const toError = (error: unknown): FrappeApiError => {
   if (error && typeof error === "object" && "data" in error) {
@@ -69,16 +78,20 @@ const submitDocByName = async <T>(run: QueryRunner, doctype: string, name: strin
   return result;
 };
 
-const toIsoDateTime = (value?: string) => {
-  if (!value) {
-    return new Date().toISOString();
-  }
-
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.valueOf()) ? new Date().toISOString() : parsed.toISOString();
+const padDatePart = (value: number) => String(value).padStart(2, "0");
+const toDbDateTime = (value?: string) => {
+  const parsed = value ? new Date(value) : new Date();
+  const date = Number.isNaN(parsed.valueOf()) ? new Date() : parsed;
+  const year = date.getFullYear();
+  const month = padDatePart(date.getMonth() + 1);
+  const day = padDatePart(date.getDate());
+  const hours = padDatePart(date.getHours());
+  const minutes = padDatePart(date.getMinutes());
+  const seconds = padDatePart(date.getSeconds());
+  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 };
 
-const toDateOnly = (value?: string) => toIsoDateTime(value).slice(0, 10);
+const toDateOnly = (value?: string) => toDbDateTime(value).slice(0, 10);
 const toDocStatus = (value: unknown) => {
   const parsed = toNumber(value);
   return parsed === 1 || parsed === 2 ? (parsed as 1 | 2) : 0;
@@ -139,7 +152,6 @@ const toPosSession = (row: Record<string, unknown>, profile?: PosProfileLookup):
   status: toString(row.status),
   opening_time:
     toString(row.period_start_date) ??
-    toString(row.opening_time) ??
     toString(row.creation),
   closing_time: toString(row.period_end_date),
   posting_date: toString(row.posting_date),
@@ -173,7 +185,7 @@ const toModeSummary = (rows: Array<{ mode_of_payment: string; amount: number }>)
 
 const mapPosInvoiceDoc = (row: Record<string, unknown>): PosInvoiceDoc => ({
   name: toString(row.name),
-  customer: toString(row.customer) ?? "Walk-in Customer",
+  customer: toString(row.customer) ?? "",
   posting_date: toString(row.posting_date) ?? toDateOnly(),
   due_date: toString(row.due_date),
   is_pos: 1,
@@ -232,7 +244,7 @@ const mapPosInvoiceDoc = (row: Record<string, unknown>): PosInvoiceDoc => ({
   status: toString(row.status)
 });
 
-export const posApi = frappeApi.injectEndpoints({
+const posApiFactory = () => frappeApi.injectEndpoints({
   endpoints: (builder) => ({
     listPosProfiles: builder.query<PosProfileLookup[], void>({
       async queryFn(_arg, _api, _extra, baseQuery) {
@@ -298,10 +310,8 @@ export const posApi = frappeApi.injectEndpoints({
           "docstatus",
           "posting_date",
           "period_start_date",
-          "opening_time",
           "remarks",
-          "set_warehouse",
-          "balance_details"
+          "set_warehouse"
         ];
         const fallbackFields = ["name", "pos_profile", "company", "user", "owner", "docstatus", "posting_date", "creation"];
         const userFilters: unknown[][] = user
@@ -366,7 +376,19 @@ export const posApi = frappeApi.injectEndpoints({
             }
           }
 
-          const profileName = toString(active.pos_profile);
+          let openingRow = active;
+          const openingName = toString(active.name);
+          if (openingName) {
+            const openingDetailResult = await run({
+              url: `/resource/POS Opening Entry/${encodeURIComponent(openingName)}`,
+              method: "GET"
+            });
+            if (!hasError(openingDetailResult)) {
+              openingRow = (openingDetailResult.data as FrappeDocResponse<Record<string, unknown>>).data;
+            }
+          }
+
+          const profileName = toString(openingRow.pos_profile) ?? toString(active.pos_profile);
           let profile: PosProfileLookup | undefined;
           if (profileName) {
             const profileResult = await run({
@@ -386,7 +408,7 @@ export const posApi = frappeApi.injectEndpoints({
             }
           }
 
-          return { data: toPosSession(active, profile) };
+          return { data: toPosSession(openingRow, profile) };
         }
 
         return { data: null };
@@ -402,8 +424,9 @@ export const posApi = frappeApi.injectEndpoints({
           doctype: "POS Opening Entry",
           pos_profile: payload.pos_profile,
           company: payload.company,
+          user: toString(payload.user),
           posting_date: toDateOnly(startDate),
-          period_start_date: toIsoDateTime(startDate),
+          period_start_date: toDbDateTime(startDate),
           remarks: toString(payload.remarks),
           balance_details: [
             {
@@ -747,20 +770,57 @@ export const posApi = frappeApi.injectEndpoints({
         const openingAmounts = toOpeningAmounts(opening);
         const openingTotal = openingAmounts.reduce((sum, row) => sum + row.opening_amount, 0);
 
+        const invoiceFields = ["name", "grand_total", "base_grand_total", "rounded_total"];
         const invoiceResult = await run({
           url: "/resource/Sales Invoice",
           method: "GET",
           params: {
-            fields: encode(["name", "grand_total", "base_grand_total", "rounded_total"]),
+            fields: encode(invoiceFields),
             filters: encode([["docstatus", "=", 1], ["is_pos", "=", 1], ["pos_opening_entry", "=", openingEntryName]]),
             order_by: "modified desc",
             limit_page_length: 500
           }
         });
 
-        const invoices = hasError(invoiceResult)
-          ? []
-          : (invoiceResult.data as FrappeListResponse<Record<string, unknown>>).data;
+        let invoices: Record<string, unknown>[] = [];
+        if (!hasError(invoiceResult)) {
+          invoices = (invoiceResult.data as FrappeListResponse<Record<string, unknown>>).data;
+        } else if (isDisallowedListFilterError(invoiceResult.error, "pos_opening_entry")) {
+          const fallbackResult = await run({
+            url: "/resource/Sales Invoice",
+            method: "GET",
+            params: {
+              fields: encode(["name", "grand_total", "base_grand_total", "rounded_total"]),
+              filters: encode([["docstatus", "=", 1], ["is_pos", "=", 1]]),
+              order_by: "modified desc",
+              limit_page_length: 500
+            }
+          });
+
+          if (hasError(fallbackResult)) {
+            return { error: toError(fallbackResult.error) };
+          }
+
+          const fallbackInvoices = (fallbackResult.data as FrappeListResponse<Record<string, unknown>>).data;
+          const detailed = await Promise.all(
+            fallbackInvoices.map(async (invoice) => {
+              const invoiceName = toString(invoice.name);
+              if (!invoiceName) {
+                return null;
+              }
+              const detailResult = await run({
+                url: `/resource/Sales%20Invoice/${encodeURIComponent(invoiceName)}`,
+                method: "GET"
+              });
+              if (hasError(detailResult)) {
+                return null;
+              }
+              const detail = (detailResult.data as FrappeDocResponse<Record<string, unknown>>).data;
+              return toString(detail.pos_opening_entry) === openingEntryName ? detail : null;
+            })
+          );
+          invoices = detailed.filter((entry): entry is Record<string, unknown> => Boolean(entry));
+        }
 
         const paymentRows = await Promise.all(
           invoices.map(async (invoice) => {
@@ -833,22 +893,29 @@ export const posApi = frappeApi.injectEndpoints({
         }
 
         const opening = (openingResult.data as FrappeDocResponse<Record<string, unknown>>).data;
+        const openingAmounts = toOpeningAmounts(opening);
+        const openingAmountTotal = openingAmounts.reduce((sum, row) => sum + Math.max(toNumber(row.opening_amount), 0), 0);
+        const openingAmountByMode = new Map(
+          openingAmounts.map((row) => [row.mode_of_payment.trim().toLowerCase(), Math.max(toNumber(row.opening_amount), 0)])
+        );
         const reconciliationRows = payload.actual_amounts.map((row) => ({
           mode_of_payment: row.mode_of_payment,
+          opening_amount: openingAmountByMode.get(row.mode_of_payment.trim().toLowerCase()) ?? 0,
           amount: Math.max(toNumber(row.amount), 0),
           closing_amount: Math.max(toNumber(row.amount), 0)
         }));
 
         const closePayload = {
           doctype: "POS Closing Entry",
-          pos_opening_entry: payload.pos_opening_entry,
-          pos_profile: toString(opening.pos_profile),
-          company: toString(opening.company),
-          posting_date: toDateOnly(),
-          period_end_date: toIsoDateTime(),
-          remarks: toString(payload.remarks),
-          payment_reconciliation: reconciliationRows
-        };
+            pos_opening_entry: payload.pos_opening_entry,
+            pos_profile: toString(opening.pos_profile),
+            company: toString(opening.company),
+            opening_amount: Number(openingAmountTotal.toFixed(2)),
+            posting_date: toDateOnly(),
+            period_end_date: toDbDateTime(),
+            remarks: toString(payload.remarks),
+            payment_reconciliation: reconciliationRows
+          };
 
         const createResult = await run({
           url: "/resource/POS Closing Entry",
@@ -916,28 +983,65 @@ export const posApi = frappeApi.injectEndpoints({
         const openingEntry = typeof arg === "object" ? arg.openingEntry?.trim() : undefined;
         const userId = typeof arg === "object" ? arg.userId?.trim() : undefined;
 
-        const filters: unknown[][] = [["docstatus", "=", 0], ["is_pos", "=", 1]];
-        if (openingEntry) {
-          filters.push(["pos_opening_entry", "=", openingEntry]);
-        }
+        const baseFilters: unknown[][] = [["docstatus", "=", 0], ["is_pos", "=", 1]];
+        const directFilters = openingEntry
+          ? [...baseFilters, ["pos_opening_entry", "=", openingEntry]]
+          : baseFilters;
 
         const result = await run({
           url: "/resource/Sales Invoice",
           method: "GET",
           params: {
             fields: encode(["name", "customer", "posting_date", "grand_total", "status", "modified", "owner"]),
-            filters: encode(filters),
+            filters: encode(directFilters),
             ...(userId ? { or_filters: encode([["owner", "=", userId]]) } : {}),
             order_by: "modified desc",
             limit_page_length: 100
           }
         });
 
-        if (hasError(result)) {
+        let rows: Record<string, unknown>[] = [];
+        if (!hasError(result)) {
+          rows = (result.data as FrappeListResponse<Record<string, unknown>>).data;
+        } else if (openingEntry && isDisallowedListFilterError(result.error, "pos_opening_entry")) {
+          const fallbackResult = await run({
+            url: "/resource/Sales Invoice",
+            method: "GET",
+            params: {
+              fields: encode(["name", "customer", "posting_date", "grand_total", "status", "modified", "owner"]),
+              filters: encode(baseFilters),
+              ...(userId ? { or_filters: encode([["owner", "=", userId]]) } : {}),
+              order_by: "modified desc",
+              limit_page_length: 100
+            }
+          });
+
+          if (hasError(fallbackResult)) {
+            return { error: toError(fallbackResult.error) };
+          }
+
+          const fallbackRows = (fallbackResult.data as FrappeListResponse<Record<string, unknown>>).data;
+          const detailed = await Promise.all(
+            fallbackRows.map(async (row) => {
+              const invoiceName = toString(row.name);
+              if (!invoiceName) {
+                return null;
+              }
+              const detailResult = await run({
+                url: `/resource/Sales%20Invoice/${encodeURIComponent(invoiceName)}`,
+                method: "GET"
+              });
+              if (hasError(detailResult)) {
+                return null;
+              }
+              const detail = (detailResult.data as FrappeDocResponse<Record<string, unknown>>).data;
+              return toString(detail.pos_opening_entry) === openingEntry ? row : null;
+            })
+          );
+          rows = detailed.filter((entry): entry is Record<string, unknown> => Boolean(entry));
+        } else {
           return { error: toError(result.error) };
         }
-
-        const rows = (result.data as FrappeListResponse<Record<string, unknown>>).data;
         return {
           data: rows.map((row) => ({
             label: String(row.name ?? ""),
@@ -972,6 +1076,14 @@ export const posApi = frappeApi.injectEndpoints({
     })
   })
 });
+
+type PosApiInstance = ReturnType<typeof posApiFactory>;
+
+const posApiStore = globalThis as typeof globalThis & {
+  __textileErpPosApi?: PosApiInstance;
+};
+
+export const posApi = posApiStore.__textileErpPosApi ?? (posApiStore.__textileErpPosApi = posApiFactory());
 
 export const {
   useListPosProfilesQuery,

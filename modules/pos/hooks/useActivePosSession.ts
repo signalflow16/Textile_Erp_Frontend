@@ -8,7 +8,7 @@ import { useAppSelector } from "@/core/store/hooks";
 export const useActivePosSession = () => {
   const me = useAppSelector((state) => state.auth.me);
   const userId = useMemo(
-    () => (typeof me?.email === "string" && me.email ? me.email : (typeof me?.user_id === "string" ? me.user_id : undefined)),
+    () => (typeof me?.user_id === "string" && me.user_id ? me.user_id : (typeof me?.email === "string" ? me.email : undefined)),
     [me?.email, me?.user_id]
   );
 

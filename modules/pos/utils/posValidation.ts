@@ -31,6 +31,10 @@ export const validatePosBeforeSubmit = (form: PosFormState, items: PosCartItem[]
     return "Choose a payment mode before submitting.";
   }
 
+  if (typeof form.paid_amount !== "number" || !Number.isFinite(form.paid_amount) || form.paid_amount < 0) {
+    return "Enter a valid paid amount before submitting.";
+  }
+
   return null;
 };
 

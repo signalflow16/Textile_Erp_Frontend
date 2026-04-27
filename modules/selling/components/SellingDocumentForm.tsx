@@ -14,10 +14,66 @@ import { toSellingErrorMessage } from "@/modules/selling/utils/errorMapper";
 
 type SellingFormKind = "quotation" | "sales-order" | "delivery-note";
 type DocLike = Record<string, unknown>;
+type SellingItemFormRow = {
+  qty?: unknown;
+  rate?: unknown;
+  amount?: unknown;
+};
 
 const today = () => new Date().toISOString().slice(0, 10);
 const nowTime = () => new Date().toTimeString().slice(0, 8);
 const nextMonth = () => new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
+const toFiniteNumber = (value: unknown) => {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+
+  return undefined;
+};
+
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+
+const recalculateItemAmounts = (items: unknown) => {
+  if (!Array.isArray(items)) {
+    return {
+      items: [],
+      grandTotal: 0
+    };
+  }
+
+  let grandTotal = 0;
+
+  const normalizedItems = items.map((item) => {
+    if (!item || typeof item !== "object") {
+      return item;
+    }
+
+    const row = item as SellingItemFormRow & Record<string, unknown>;
+    const qty = toFiniteNumber(row.qty) ?? 0;
+    const rate = toFiniteNumber(row.rate);
+    const amount = rate === undefined ? undefined : roundCurrency(qty * rate);
+
+    grandTotal += amount ?? 0;
+
+    return {
+      ...row,
+      amount
+    };
+  });
+
+  return {
+    items: normalizedItems,
+    grandTotal: roundCurrency(grandTotal)
+  };
+};
 
 const defaultByKind = (kind: SellingFormKind): DocLike => {
   if (kind === "quotation") {
@@ -84,7 +140,7 @@ export function SellingDocumentForm({
       typeof initialValues?.customer === "string" ? initialValues.customer :
       undefined;
 
-    form.setFieldsValue({
+    const seededValues = {
       ...defaultByKind(kind),
       ...(initialValues ?? {}),
       ...(kind === "quotation"
@@ -94,6 +150,13 @@ export function SellingDocumentForm({
             customer: resolvedCustomer
           }
         : {})
+    } as Record<string, unknown>;
+    const { items, grandTotal } = recalculateItemAmounts(seededValues.items);
+
+    form.setFieldsValue({
+      ...seededValues,
+      items,
+      grand_total: grandTotal
     } as never);
   }, [form, initialValues, kind]);
 
@@ -168,7 +231,23 @@ export function SellingDocumentForm({
       ) : null}
 
       <Card>
-        <Form<Record<string, unknown>> form={form} layout="vertical" requiredMark={false} disabled={!canEdit || masters.isLoading}>
+        <Form<Record<string, unknown>>
+          form={form}
+          layout="vertical"
+          requiredMark={false}
+          disabled={!canEdit || masters.isLoading}
+          onValuesChange={(changedValues, allValues) => {
+            if (!("items" in changedValues)) {
+              return;
+            }
+
+            const { items, grandTotal } = recalculateItemAmounts((allValues as { items?: unknown }).items);
+            form.setFieldsValue({
+              items,
+              grand_total: grandTotal
+            } as never);
+          }}
+        >
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 12 }}>
             {!canEdit ? (
               <Button disabled>Submitted/Cancelled</Button>

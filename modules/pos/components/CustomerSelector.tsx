@@ -27,14 +27,14 @@ export function CustomerSelector({
           showSearch
           optionFilterProp="label"
           placeholder="Select customer"
-          value={customer}
+          value={customer || undefined}
           options={customerOptions}
           loading={loading}
           onChange={onCustomerChange}
         />
         <Space size={12}>
           <Text type="secondary">Selected:</Text>
-          <Tag color="blue">{selectedCustomerLabel || "Walk-in Customer"}</Tag>
+          <Tag color="blue">{selectedCustomerLabel || "No customer selected"}</Tag>
           <Link href="/initial-setup/customers">Manage Customers</Link>
         </Space>
       </div>

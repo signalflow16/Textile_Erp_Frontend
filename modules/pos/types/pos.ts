@@ -53,6 +53,7 @@ export type PosDiscountMode = "item" | "overall" | "both";
 export type PosOpeningEntryPayload = {
   pos_profile: string;
   company?: string;
+  user?: string;
   opening_cash: number;
   remarks?: string;
 };

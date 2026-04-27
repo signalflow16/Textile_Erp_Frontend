@@ -56,7 +56,7 @@ export const listDocs = async <T>(runner: ResourceRunner, doctype: string, param
   return (result.data as FrappeListResponse<T>).data;
 };
 
-export const submitDoc = async <T>(runner: ResourceRunner, doctype: string, name: string, fallbackDoc?: Record<string, unknown>): Promise<T | { error: ResourceApiError }> => {
+export const submitDoc = async <T>(runner: ResourceRunner, doctype: string, name: string, _fallbackDoc?: Record<string, unknown>): Promise<T | { error: ResourceApiError }> => {
   const primary = await runner({
     // Primary modern strategy
     url: `/v2/document/${encodeURIComponent(doctype)}/${encodeURIComponent(name)}/method/submit`,
@@ -74,42 +74,40 @@ export const submitDoc = async <T>(runner: ResourceRunner, doctype: string, name
     }
   }
 
-  // Fallback legacy strategy
-  const loaded = fallbackDoc ?? (() => {
-    const maybeLoaded = primary;
-    if (!isResourceError(maybeLoaded)) {
-      return null;
-    }
-    return null;
-  })();
-
-  const docForSubmit = loaded ?? await getDoc<Record<string, unknown>>(runner, doctype, name);
-  if (typeof docForSubmit === "object" && docForSubmit !== null && "error" in docForSubmit) {
-    return { error: (docForSubmit as { error: ResourceApiError }).error };
-  }
-
-  const fallback = await runner({
+  // Fallback legacy strategy.
+  // Prefer the minimal reference form first because some ERPNext setups reject
+  // a fully-expanded document payload during submit.
+  const minimalSubmit = await runner({
     url: "/method/frappe.client.submit",
     method: "POST",
     data: {
-      doc: docForSubmit
+      doc: {
+        doctype,
+        name
+      }
     }
   });
 
-  if (isResourceError(fallback)) {
-    return { error: toResourceError(fallback.error) };
+  if (!isResourceError(minimalSubmit)) {
+    const minimalPayload = minimalSubmit.data as FrappeDocResponse<T> | { message?: T };
+    if (minimalPayload && typeof minimalPayload === "object" && "data" in minimalPayload && minimalPayload.data) {
+      return minimalPayload.data;
+    }
+
+    if (minimalPayload && typeof minimalPayload === "object" && "message" in minimalPayload && minimalPayload.message) {
+      return minimalPayload.message;
+    }
   }
 
-  const fallbackPayload = fallback.data as FrappeDocResponse<T> | { message?: T };
-  if (fallbackPayload && typeof fallbackPayload === "object" && "data" in fallbackPayload && fallbackPayload.data) {
-    return fallbackPayload.data;
+  if (isResourceError(minimalSubmit)) {
+    return { error: toResourceError(minimalSubmit.error) };
   }
 
-  if (fallbackPayload && typeof fallbackPayload === "object" && "message" in fallbackPayload && fallbackPayload.message) {
-    return fallbackPayload.message;
-  }
-
-  return docForSubmit as T;
+  return {
+    error: {
+      data: "Document submit did not return a valid ERPNext response."
+    }
+  };
 };
 
 export const saveDraft = async <T>(runner: ResourceRunner, doctype: string, payload: unknown, name?: string) => {

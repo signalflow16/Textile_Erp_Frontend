@@ -20,7 +20,7 @@ export const toPosInvoicePayload = (form: PosFormState, items: PosCartItem[]): P
     : totals.grandTotal;
 
   return {
-    customer: clean(form.customer) ?? "Walk-in Customer",
+    customer: clean(form.customer) ?? "",
     posting_date: form.posting_date,
     due_date: form.posting_date,
     is_pos: 1,
@@ -29,21 +29,17 @@ export const toPosInvoicePayload = (form: PosFormState, items: PosCartItem[]): P
     pos_opening_entry: clean(form.pos_opening_entry),
     set_warehouse: clean(form.set_warehouse),
     remarks: clean(form.remarks),
-    mode_of_payment: clean(form.mode_of_payment),
     paid_amount: paidAmount,
     additional_discount_percentage:
       overallDiscountEnabled && form.overall_discount_percentage > 0 ? form.overall_discount_percentage : undefined,
     apply_discount_on: overallDiscountEnabled && form.overall_discount_percentage > 0 ? "Net Total" : undefined,
     items: items.map((row) => ({
       item_code: row.item_code,
-      item_name: clean(row.item_name),
       qty: row.qty,
       uom: clean(row.uom),
       rate: row.rate,
-      gst_hsn_code: clean(row.hs_code),
       discount_percentage: itemDiscountEnabled && row.discount_percentage > 0 ? row.discount_percentage : undefined,
       discount_amount: itemDiscountEnabled && row.discount_amount > 0 ? row.discount_amount : undefined,
-      barcode: clean(row.barcode),
       warehouse: clean(row.warehouse) ?? clean(form.set_warehouse)
     })),
     payments: form.mode_of_payment
