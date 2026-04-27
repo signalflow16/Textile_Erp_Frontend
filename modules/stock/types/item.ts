@@ -1,6 +1,13 @@
 export type LookupOption = {
   label: string;
   value: string;
+  item_name?: string;
+  variant_of?: string | null;
+  has_variants?: 0 | 1;
+  has_batch_no?: 0 | 1;
+  color?: string | null;
+  size?: string | null;
+  design?: string | null;
 };
 
 export type WarehouseLookupOption = LookupOption & {
@@ -51,6 +58,10 @@ export type ItemRow = {
   disabled: 0 | 1;
   is_stock_item: 0 | 1;
   has_variants: 0 | 1;
+  has_batch_no?: 0 | 1;
+  color?: string | null;
+  size?: string | null;
+  design?: string | null;
   modified: string;
   image?: string | null;
 };
@@ -106,6 +117,7 @@ export type ItemDocument = {
   customer_provided_item?: 0 | 1;
   grant_commission?: 0 | 1;
   allow_sales?: 0 | 1;
+  has_batch_no?: 0 | 1;
   max_discount?: number;
   inspection_required_before_purchase?: 0 | 1;
   inspection_required_before_delivery?: 0 | 1;

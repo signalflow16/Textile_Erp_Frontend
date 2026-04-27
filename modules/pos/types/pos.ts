@@ -9,6 +9,8 @@ export type PosItemLookup = PosLookupOption & {
   standard_rate?: number;
   barcode?: string;
   variant_of?: string;
+  has_variants?: 0 | 1;
+  has_batch_no?: 0 | 1;
   hs_code?: string;
   color?: string;
   size?: string;
@@ -97,9 +99,12 @@ export type PosCartItem = {
   warehouse?: string;
   barcode?: string;
   variant_of?: string;
+  has_variants?: 0 | 1;
   color?: string;
   size?: string;
   design?: string;
+  has_batch_no?: 0 | 1;
+  batch_no?: string;
   available_qty?: number;
 };
 

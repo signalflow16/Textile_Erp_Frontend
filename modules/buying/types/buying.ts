@@ -17,6 +17,13 @@ export type BuyingRouteKey =
 export type LookupOption = {
   label: string;
   value: string;
+  item_name?: string;
+  variant_of?: string | null;
+  has_variants?: 0 | 1;
+  has_batch_no?: 0 | 1;
+  color?: string | null;
+  size?: string | null;
+  design?: string | null;
 };
 
 export type BuyingDocStatus = 0 | 1 | 2;

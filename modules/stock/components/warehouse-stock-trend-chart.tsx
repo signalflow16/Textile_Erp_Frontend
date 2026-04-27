@@ -1,6 +1,14 @@
 "use client";
 
-import { Area } from "@ant-design/charts";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 
 import type { StockValueTrendPoint } from "@/modules/stock/types";
 import { useStockTrendData } from "./use-stock-trend-data";
@@ -16,56 +24,39 @@ export function WarehouseStockTrendChart({ rows }: { rows: StockValueTrendPoint[
 
   return (
     <div className="warehouse-stock-trend-chart">
-      <Area
-        data={data}
-        xField="date"
-        yField="value"
-        autoFit
-        padding={[20, 20, 40, 12]}
-        axis={{
-          x: {
-            title: false,
-            labelAutoRotate: false,
-            labelAutoHide: true,
-            labelFill: "#64748b",
-            grid: false,
-            line: false,
-            tick: false
-          },
-          y: {
-            title: false,
-            labelFill: "#64748b",
-            gridLineDash: [4, 4],
-            gridStroke: "#e8edf5",
-            line: false
-          }
-        }}
-        line={{
-          style: {
-            stroke: "#1677ff",
-            lineWidth: 3,
-            shadowColor: "rgba(22, 119, 255, 0.18)",
-            shadowBlur: 12
-          }
-        }}
-        area={{
-          style: {
-            fill: "l(270) 0:#91caff66 1:#ffffff0d"
-          }
-        }}
-        tooltip={{
-          title: (datum: { date: string }) => datum.date,
-          items: [
-            (datum: { value: number }) => ({
-              name: "Stock Value",
-              value: currencyFormatter.format(datum.value)
-            })
-          ]
-        }}
-        style={{
-          shape: "smooth"
-        }}
-      />
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 12, right: 10, left: -16, bottom: 8 }}>
+          <defs>
+            <linearGradient id="warehouseStockAreaGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#1677ff" stopOpacity={0.32} />
+              <stop offset="100%" stopColor="#1677ff" stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid stroke="#e8edf5" strokeDasharray="4 4" vertical={false} />
+          <XAxis dataKey="date" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#64748b" }} />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tick={{ fontSize: 12, fill: "#64748b" }}
+            tickFormatter={(value: number) => currencyFormatter.format(value)}
+            width={90}
+          />
+          <RechartsTooltip
+            labelFormatter={(label) => `Date: ${label}`}
+            formatter={(value: unknown) => ["Stock Value", currencyFormatter.format(Number(value ?? 0))]}
+            contentStyle={{ borderRadius: 10, border: "1px solid #e5ebf3" }}
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke="#1677ff"
+            strokeWidth={3}
+            fill="url(#warehouseStockAreaGradient)"
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 0 }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
     </div>
   );
 }

@@ -45,7 +45,14 @@ const mapLookupOptions = <T extends Record<string, unknown>>(rows: T[], key: key
 
     options.push({
       value,
-      label: typeof label === "string" && label.trim() ? label : value
+      label: typeof label === "string" && label.trim() ? label : value,
+      item_name: typeof row.item_name === "string" ? row.item_name : undefined,
+      variant_of: typeof row.variant_of === "string" ? row.variant_of : null,
+      has_variants: row.has_variants ? 1 : 0,
+      has_batch_no: row.has_batch_no ? 1 : 0,
+      color: typeof row.color === "string" ? row.color : null,
+      size: typeof row.size === "string" ? row.size : null,
+      design: typeof row.design === "string" ? row.design : null
     });
     return options;
   }, []);
@@ -70,9 +77,19 @@ export const fetchLookupCache = createAsyncThunk<
     switch (key) {
       case "items":
         items = mapLookupOptions(
-          await fetchAllFrappePages<{ name: string; item_name?: string | null }>({
+          await fetchAllFrappePages<{
+            name: string;
+            item_name?: string | null;
+            variant_of?: string | null;
+            has_variants?: 0 | 1 | boolean | null;
+            has_batch_no?: 0 | 1 | boolean | null;
+            color?: string | null;
+            size?: string | null;
+            design?: string | null;
+          }>({
             url: masterDataEndpoints.item.list,
-            fields: ["name", "item_name"],
+            fields: ["name", "item_name", "variant_of", "has_variants", "has_batch_no", "color", "size", "design"],
+            filters: [["disabled", "=", 0]],
             orderBy: "item_name asc"
           }),
           "name",

@@ -27,8 +27,15 @@ type FrappeItemRow = {
   rate?: number | string | null;
   amount?: number | string | null;
   warehouse?: string | null;
+  batch_no?: string | null;
   target_warehouse?: string | null;
   source_warehouse?: string | null;
+  variant_of?: string | null;
+  has_variants?: 0 | 1 | boolean | null;
+  has_batch_no?: 0 | 1 | boolean | null;
+  color?: string | null;
+  size?: string | null;
+  design?: string | null;
 };
 
 type FrappeTaxRow = {
@@ -157,8 +164,15 @@ export const toDocumentLineItem = (row: FrappeItemRow): DocumentLineItem => {
     rate,
     amount: parseFrappeNumber(row.amount) || qty * rate,
     warehouse: row.warehouse || undefined,
+    batch_no: row.batch_no || undefined,
     source_warehouse: row.source_warehouse || undefined,
     target_warehouse: row.target_warehouse || undefined,
+    variant_of: row.variant_of || undefined,
+    has_variants: row.has_variants ? 1 : 0,
+    has_batch_no: row.has_batch_no ? 1 : 0,
+    color: row.color || null,
+    size: row.size || null,
+    design: row.design || null,
     manual_rate: true
   };
 };
@@ -240,8 +254,15 @@ export const serializeDocumentPayload = (config: DocumentEngineConfig, document:
       rate: parseFrappeNumber(row.rate),
       amount: parseFrappeNumber(row.amount),
       warehouse: row.warehouse || undefined,
+      batch_no: row.batch_no || undefined,
       source_warehouse: row.source_warehouse || undefined,
-      target_warehouse: row.target_warehouse || undefined
+      target_warehouse: row.target_warehouse || undefined,
+      variant_of: row.variant_of || undefined,
+      has_variants: row.has_variants ? 1 : 0,
+      has_batch_no: row.has_batch_no ? 1 : 0,
+      color: row.color || null,
+      size: row.size || null,
+      design: row.design || null
     })),
   taxes: (document.taxes ?? [])
     .filter((row) => row.account_head || row.description)

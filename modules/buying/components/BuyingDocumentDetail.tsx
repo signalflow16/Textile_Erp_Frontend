@@ -47,6 +47,10 @@ export function BuyingDocumentDetail({
 
   const doc = document ?? {};
   const items = Array.isArray(doc.items) ? (doc.items as Array<Record<string, unknown>>) : [];
+  const itemsWithKeys = items.map((row, index) => ({
+    ...row,
+    __rowKey: String(row.name ?? row.item_code ?? `item-${index}`)
+  }));
   const docName = typeof doc.name === "string" ? doc.name : null;
   const canEdit = isDraft((typeof doc.docstatus === "number" ? doc.docstatus : undefined) as 0 | 1 | 2 | undefined);
   const sourceReference = (
@@ -130,8 +134,8 @@ export function BuyingDocumentDetail({
 
       <Card title="Items">
         <Table<Record<string, unknown>>
-          rowKey={(row, index) => String(row.name ?? row.item_code ?? index)}
-          dataSource={items}
+          rowKey={(row) => String(row.__rowKey)}
+          dataSource={itemsWithKeys}
           pagination={false}
           columns={[
             {

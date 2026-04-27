@@ -11,6 +11,7 @@ import { AuditTimeline } from "./audit-timeline";
 import { DocumentFormLayout } from "./document-form-layout";
 import { ItemsTableEditable } from "./items-table-editable";
 import { SummarySidebar } from "./summary-sidebar";
+import { isTemplateItem } from "@/modules/shared/variants/variant-utils";
 
 export function DocumentEditorPage({
   doctype,
@@ -34,6 +35,8 @@ export function DocumentEditorPage({
   }
 
   const hasStockIssues = model.validations.some((entry) => !entry.ok);
+  const hasVariantPolicyIssues = (model.document.items ?? []).some((row) => isTemplateItem(row));
+  const hasBatchPolicyIssues = (model.document.items ?? []).some((row) => row.has_batch_no && !row.batch_no);
 
   return (
     <DocumentFormLayout
@@ -138,7 +141,7 @@ export function DocumentEditorPage({
         <ActionFooter
           readonly={model.isReadonly}
           canCancel={model.document.docstatus === 1}
-          disableSubmit={hasStockIssues}
+          disableSubmit={hasStockIssues || hasVariantPolicyIssues || hasBatchPolicyIssues}
           loading={model.commands.saveStatus === "loading" || model.commands.submitStatus === "loading"}
           onSave={() => {
             void model.save().then((saved) => {

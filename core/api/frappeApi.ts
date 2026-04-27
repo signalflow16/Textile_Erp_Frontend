@@ -958,6 +958,10 @@ export const frappeApi = createApi({
                 "disabled",
                 "is_stock_item",
                 "has_variants",
+                "has_batch_no",
+                "color",
+                "size",
+                "design",
                 "modified"
               ])
             }
@@ -999,7 +1003,7 @@ export const frappeApi = createApi({
     getItemLookups: builder.query<ItemMasterLookups, void>({
       async queryFn(_arg, _api, _extra, baseQuery) {
         const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
-        const [itemGroupsResult, uomsResult, brandsResult, warehousesResult] = await Promise.all([
+        const [itemGroupsResult, uomsResult, brandsResult, warehousesResult, variantParentsResult] = await Promise.all([
           run({
             url: "/resource/Item Group",
             method: "GET",
@@ -1035,6 +1039,16 @@ export const frappeApi = createApi({
               order_by: "name asc",
               limit_page_length: 500
             }
+          }),
+          run({
+            url: "/resource/Item",
+            method: "GET",
+            params: {
+              fields: encodeFrappeJson(["name", "item_name"]),
+              filters: encodeFrappeJson([["has_variants", "=", 1], ["disabled", "=", 0]]),
+              order_by: "item_name asc",
+              limit_page_length: 500
+            }
           })
         ]);
 
@@ -1052,6 +1066,10 @@ export const frappeApi = createApi({
 
         if (hasQueryError(warehousesResult)) {
           return { error: toBaseQueryError(warehousesResult.error) };
+        }
+
+        if (hasQueryError(variantParentsResult)) {
+          return { error: toBaseQueryError(variantParentsResult.error) };
         }
 
         const item_groups = (itemGroupsResult.data as FrappeListResponse<{ name: string }>).data.map((entry) => ({
@@ -1073,6 +1091,12 @@ export const frappeApi = createApi({
           value: entry.name,
           is_group: toBitFlag(entry.is_group)
         }));
+        const variant_parent_candidates = (
+          variantParentsResult.data as FrappeListResponse<{ name: string; item_name?: string | null }>
+        ).data.map((entry) => ({
+          label: entry.item_name?.trim() || entry.name,
+          value: entry.name
+        }));
 
         return {
           data: {
@@ -1083,7 +1107,7 @@ export const frappeApi = createApi({
             quality_templates: [],
             tax_templates: [],
             price_lists: [],
-            variant_parent_candidates: [],
+            variant_parent_candidates,
             item_attributes: [],
             collections: [],
             seasons: [],
@@ -1258,6 +1282,64 @@ export const frappeApi = createApi({
       transformResponse: (response: { data: ItemDocument }) => response.data,
       providesTags: (_result, _error, itemCode) => [{ type: "Item", id: itemCode }]
     }),
+    getItemAttributeOptions: builder.query<ItemMasterLookups["item_attributes"], void>({
+      async queryFn(_arg, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+        const listResult = await run({
+          url: "/resource/Item Attribute",
+          method: "GET",
+          params: {
+            fields: encodeFrappeJson(["name", "attribute_name"]),
+            order_by: "modified desc",
+            limit_page_length: 500
+          }
+        });
+
+        if (hasQueryError(listResult)) {
+          return { error: toBaseQueryError(listResult.error) };
+        }
+
+        const rows = (listResult.data as FrappeListResponse<{ name: string; attribute_name?: string | null }>).data;
+        const detailResults = await Promise.all(
+          rows.map(async (row) => {
+            const detailResult = await run({
+              url: `/resource/Item Attribute/${encodeURIComponent(row.name)}`,
+              method: "GET"
+            });
+            if (hasQueryError(detailResult)) {
+              return {
+                label: row.attribute_name?.trim() || row.name,
+                value: row.name,
+                values: []
+              };
+            }
+
+            const detail = (
+              detailResult.data as FrappeDocResponse<{
+                name: string;
+                attribute_name?: string | null;
+                item_attribute_values?: Array<{ attribute_value?: string | null }>;
+              }>
+            ).data;
+
+            const values =
+              detail.item_attribute_values
+                ?.map((entry) => entry.attribute_value?.trim())
+                .filter((entry): entry is string => Boolean(entry))
+                .map((entry) => ({ label: entry, value: entry })) ?? [];
+
+            return {
+              label: detail.attribute_name?.trim() || row.attribute_name?.trim() || detail.name,
+              value: detail.name,
+              values
+            };
+          })
+        );
+
+        return { data: detailResults };
+      },
+      providesTags: ["Lookups"]
+    }),
     getItemVariantAttributeLookups: builder.query<ItemVariantAttributeLookups, string | void>({
       query: (templateItem) =>
         templateItem
@@ -1285,6 +1367,59 @@ export const frappeApi = createApi({
       }),
       transformResponse: (response: FrappeMessageResponse<ItemMutationResponse>) => response.message.item,
       invalidatesTags: ["ItemList", "Lookups"]
+    }),
+    createItemAttribute: builder.mutation<
+      { name: string; label: string },
+      { attributeName: string; values: string[] }
+    >({
+      async queryFn({ attributeName, values }, _api, _extra, baseQuery) {
+        const run = (arg: QueryArg) => baseQuery(arg) as Promise<BaseQueryResult>;
+        const cleanName = attributeName.trim();
+        const cleanValues = values.map((entry) => entry.trim()).filter(Boolean);
+
+        if (!cleanName) {
+          return {
+            error: toBaseQueryError({
+              status: 400,
+              data: { message: "Attribute name is required." }
+            })
+          };
+        }
+
+        if (!cleanValues.length) {
+          return {
+            error: toBaseQueryError({
+              status: 400,
+              data: { message: "At least one attribute value is required." }
+            })
+          };
+        }
+
+        const createResult = await run({
+          url: "/resource/Item Attribute",
+          method: "POST",
+          data: {
+            attribute_name: cleanName,
+            item_attribute_values: cleanValues.map((value) => ({
+              attribute_value: value,
+              abbr: value.slice(0, 6).toUpperCase()
+            }))
+          }
+        });
+
+        if (hasQueryError(createResult)) {
+          return { error: toBaseQueryError(createResult.error) };
+        }
+
+        const record = (createResult.data as FrappeDocResponse<{ name: string; attribute_name?: string }>).data;
+        return {
+          data: {
+            name: record.name,
+            label: record.attribute_name?.trim() || record.name
+          }
+        };
+      },
+      invalidatesTags: ["Lookups"]
     }),
     updateItem: builder.mutation<ItemDocument, { itemCode: string; values: Partial<ItemDocument> }>({
       query: ({ itemCode, values: payload }) => ({
@@ -1510,6 +1645,7 @@ export const frappeApi = createApi({
 export const {
   useAuthMeQuery,
   useCreateUserAccountMutation,
+  useCreateItemAttributeMutation,
   useCreateItemGroupMutation,
   useCreateItemMutation,
   useLazyAuthMeQuery,
@@ -1520,6 +1656,7 @@ export const {
   useGetItemGroupQuery,
   useGetItemGroupTreeQuery,
   useGetItemCodeAvailabilityQuery,
+  useGetItemAttributeOptionsQuery,
   useGetItemListQuery,
   useGetItemLookupsQuery,
   useGetItemPriceListQuery,

@@ -14,6 +14,7 @@ import type {
 } from "@/modules/buying/types/buying";
 import type { FrappeApiError, FrappeDocResponse, FrappeListResponse } from "@/modules/buying/types/frappe";
 import { submitDoc } from "@/modules/buying/api/documentActions";
+import { toVariantItemLabel } from "@/modules/shared/variants/variant-utils";
 import {
   mapMaterialRequestPayload,
   mapPurchaseInvoicePayload,
@@ -87,6 +88,40 @@ const mapLookupRows = (rows: Array<{ name: string }>) =>
     label: row.name,
     value: row.name
   }));
+
+const mapItemLookupRows = (
+  rows: Array<{
+    name: string;
+    item_name?: string | null;
+    variant_of?: string | null;
+    has_variants?: 0 | 1 | boolean | null;
+    has_batch_no?: 0 | 1 | boolean | null;
+    color?: string | null;
+    size?: string | null;
+    design?: string | null;
+  }>
+) =>
+  rows
+    .map((row) => ({
+    label: toVariantItemLabel({
+      item_code: row.name,
+      item_name: row.item_name,
+      variant_of: row.variant_of,
+      has_variants: row.has_variants ? 1 : 0,
+      color: row.color,
+      size: row.size,
+      design: row.design
+    }),
+    value: row.name,
+    item_name: row.item_name ?? undefined,
+    variant_of: row.variant_of ?? null,
+    has_variants: (row.has_variants ? 1 : 0) as 0 | 1,
+    has_batch_no: (row.has_batch_no ? 1 : 0) as 0 | 1,
+    color: row.color ?? null,
+    size: row.size ?? null,
+    design: row.design ?? null
+  }))
+    .filter((row) => !(row.has_variants && !row.variant_of));
 
 const normalizeDocItems = (items: unknown): Array<Record<string, unknown>> => {
   if (!Array.isArray(items)) {
@@ -249,6 +284,7 @@ const submitDocByName = async <T>(
 };
 
 export const buyingApi = frappeApi.injectEndpoints({
+  overrideExisting: true,
   endpoints: (builder) => ({
     listWarehouses: builder.query<LookupOption[], string | void>({
       async queryFn(company, _api, _extra, baseQuery) {
@@ -290,9 +326,10 @@ export const buyingApi = frappeApi.injectEndpoints({
             url: "/resource/Item",
             method: "GET",
             params: {
-              fields: encode(["name"]),
-              order_by: "name asc",
-              limit_page_length: 500
+              fields: encode(["name", "item_name", "variant_of", "has_variants", "has_batch_no", "color", "size", "design"]),
+              filters: encode([["disabled", "=", 0]]),
+              order_by: "item_name asc",
+              limit_page_length: 1000
             }
           }),
           run({
@@ -356,7 +393,16 @@ export const buyingApi = frappeApi.injectEndpoints({
 
         return {
           data: {
-            items: mapLookupRows((items.data as FrappeListResponse<{ name: string }>).data),
+            items: mapItemLookupRows((items.data as FrappeListResponse<{
+              name: string;
+              item_name?: string | null;
+              variant_of?: string | null;
+              has_variants?: 0 | 1 | boolean | null;
+              has_batch_no?: 0 | 1 | boolean | null;
+              color?: string | null;
+              size?: string | null;
+              design?: string | null;
+            }>).data),
             suppliers: mapLookupRows((suppliers.data as FrappeListResponse<{ name: string }>).data),
             warehouses: mapLookupRows((warehouses.data as FrappeListResponse<{ name: string }>).data),
             companies: mapLookupRows((companies.data as FrappeListResponse<{ name: string }>).data),

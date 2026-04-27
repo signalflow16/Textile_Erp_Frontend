@@ -8,6 +8,8 @@ import type { ColumnsType } from "antd/es/table";
 import { useProductSearch } from "@/modules/pos/hooks/useProductSearch";
 import type { PosCartItem } from "@/modules/pos/types/pos";
 import { calcLineAmount } from "@/modules/pos/utils/posCalculations";
+import { isPosRowEmpty } from "@/modules/pos/utils/rowCompletion";
+import { formatVariantDescriptor } from "@/modules/shared/variants/variant-utils";
 
 const { Text } = Typography;
 
@@ -160,7 +162,12 @@ export function CartTable({
               }}
             />
             <Space size={8} wrap>
-              {row.variant_of ? <Text type="secondary">Variant: {row.variant_of}</Text> : null}
+              {row.variant_of ? (
+              <Text type="secondary">
+                Variant: {row.variant_of}
+                {formatVariantDescriptor({ color: row.color, size: row.size, design: row.design }) ? ` (${formatVariantDescriptor({ color: row.color, size: row.size, design: row.design })})` : ""}
+              </Text>
+            ) : null}
               {typeof row.available_qty === "number" ? (
                 <Tag color={hasNoStock || hasLowStock ? "red" : "green"}>
                   Stock: {row.available_qty}

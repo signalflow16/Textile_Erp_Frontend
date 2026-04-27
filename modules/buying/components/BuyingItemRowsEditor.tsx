@@ -1,9 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import { Button, Col, Form, Input, InputNumber, Row, Select, Space } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 
 import type { LookupOption } from "@/modules/buying/types/buying";
+import { isTemplateItem, variantSelectionError } from "@/modules/shared/variants/variant-utils";
 
 export function BuyingItemRowsEditor({
   itemOptions,
@@ -13,7 +15,8 @@ export function BuyingItemRowsEditor({
   withWarehouse = true,
   withScheduleDate = false,
   withBatch = false,
-  withRejectedQty = false
+  withRejectedQty = false,
+  variantOnly = true
 }: {
   itemOptions: LookupOption[];
   uomOptions: LookupOption[];
@@ -23,7 +26,14 @@ export function BuyingItemRowsEditor({
   withScheduleDate?: boolean;
   withBatch?: boolean;
   withRejectedQty?: boolean;
+  variantOnly?: boolean;
 }) {
+  const form = Form.useFormInstance();
+  const optionByCode = useMemo(
+    () => new Map(itemOptions.map((entry) => [entry.value, entry])),
+    [itemOptions]
+  );
+
   return (
     <Form.List name="items">
       {(fields, { add, remove }) => (
@@ -39,9 +49,40 @@ export function BuyingItemRowsEditor({
                     {...fieldProps}
                     label={field.name === 0 ? "Item" : ""}
                     name={[field.name, "item_code"]}
-                    rules={[{ required: true, message: "Item is required." }]}
+                    rules={[
+                      { required: true, message: "Item is required." },
+                      {
+                        validator: async (_rule, value?: string) => {
+                          if (!value || !variantOnly) {
+                            return;
+                          }
+                          const selected = optionByCode.get(value);
+                          const error = variantSelectionError({
+                            item_code: selected?.value,
+                            variant_of: selected?.variant_of,
+                            has_variants: selected?.has_variants
+                          });
+                          if (error) {
+                            throw new Error(error);
+                          }
+                        }
+                      }
+                    ]}
                   >
-                    <Select showSearch optionFilterProp="label" options={itemOptions} />
+                    <Select
+                      showSearch
+                      optionFilterProp="label"
+                      options={itemOptions}
+                      optionRender={(option) => (
+                        <Space size={6}>
+                          <span>{String(option.data.label)}</span>
+                          {isTemplateItem(option.data as LookupOption) ? <span style={{ color: "#d97706" }}>Template</span> : null}
+                          {(option.data as LookupOption).variant_of ? (
+                            <span style={{ color: "#7c3aed" }}>Variant</span>
+                          ) : null}
+                        </Space>
+                      )}
+                    />
                   </Form.Item>
                 </Col>
                 <Col xs={12} md={4}>
@@ -113,7 +154,26 @@ export function BuyingItemRowsEditor({
                 ) : null}
                 {withBatch ? (
                   <Col xs={24} md={6}>
-                    <Form.Item {...fieldProps} label="Batch No" name={[field.name, "batch_no"]}>
+                    <Form.Item
+                      {...fieldProps}
+                      label="Batch No"
+                      name={[field.name, "batch_no"]}
+                      rules={[
+                        {
+                          validator: async (_rule, value?: string) => {
+                            const selectedCode = form.getFieldValue(["items", field.name, "item_code"]) as string | undefined;
+                            const selected = selectedCode ? optionByCode.get(selectedCode) : undefined;
+                            const required = Boolean(selected?.has_batch_no);
+                            if (!required) {
+                              return;
+                            }
+                            if (!value || !String(value).trim()) {
+                              throw new Error("Batch No is required for batch-tracked items.");
+                            }
+                          }
+                        }
+                      ]}
+                    >
                       <Input />
                     </Form.Item>
                   </Col>

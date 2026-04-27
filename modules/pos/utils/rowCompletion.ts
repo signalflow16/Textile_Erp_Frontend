@@ -16,6 +16,8 @@ export const createEmptyPosRow = (): PosCartItem => ({
   color: undefined,
   size: undefined,
   design: undefined,
+  has_batch_no: 0,
+  batch_no: undefined,
   available_qty: undefined
 });
 
@@ -23,6 +25,7 @@ export const isPosRowEmpty = (row: PosCartItem) =>
   !row.item_code &&
   !(row.item_name?.trim()) &&
   !(row.barcode?.trim()) &&
+  !(row.batch_no?.trim()) &&
   !(row.hs_code?.trim()) &&
   row.qty <= 0 &&
   row.rate <= 0 &&
