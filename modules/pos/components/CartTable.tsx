@@ -9,6 +9,7 @@ import { useProductSearch } from "@/modules/pos/hooks/useProductSearch";
 import type { PosCartItem } from "@/modules/pos/types/pos";
 import { calcLineAmount } from "@/modules/pos/utils/posCalculations";
 import { isPosRowEmpty } from "@/modules/pos/utils/rowCompletion";
+import { formatVariantDescriptor } from "@/modules/shared/variants/variant-utils";
 
 const { Text } = Typography;
 
@@ -132,7 +133,12 @@ export function CartTable({
                 void onApplyItem(row.rowId, itemCode);
               }}
             />
-            {row.variant_of ? <Text type="secondary">Variant: {row.variant_of}</Text> : null}
+            {row.variant_of ? (
+              <Text type="secondary">
+                Variant: {row.variant_of}
+                {formatVariantDescriptor({ color: row.color, size: row.size, design: row.design }) ? ` (${formatVariantDescriptor({ color: row.color, size: row.size, design: row.design })})` : ""}
+              </Text>
+            ) : null}
             {typeof row.available_qty === "number" ? (
               <Tag color={hasNoStock || hasLowStock ? "red" : "green"}>
                 Stock: {row.available_qty}
@@ -227,6 +233,21 @@ export function CartTable({
       )
     },
     {
+      title: "Batch",
+      key: "batch_no",
+      width: 140,
+      render: (_value, row) => (
+        <Input
+          value={row.batch_no}
+          disabled={!row.has_batch_no}
+          placeholder={row.has_batch_no ? "Batch required" : "Not required"}
+          className="pos-table-input"
+          style={{ width: "100%" }}
+          onChange={(event) => onChangeRow(row.rowId, { batch_no: event.target.value })}
+        />
+      )
+    },
+    {
       title: "Amount",
       key: "amount",
       width: 130,
@@ -255,7 +276,7 @@ export function CartTable({
       dataSource={rows}
       columns={columns}
       pagination={false}
-      scroll={{ x: 1460 }}
+      scroll={{ x: 1600 }}
       locale={{ emptyText: "Enter rows to start billing." }}
       className="pos-entry-table"
       bordered={false}

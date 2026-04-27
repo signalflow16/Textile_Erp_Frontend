@@ -15,7 +15,8 @@ import {
   MenuUnfoldOutlined,
   RightOutlined,
   ShoppingCartOutlined,
-  TeamOutlined
+  TeamOutlined,
+  UserOutlined
 } from "@ant-design/icons";
 import { frappeApi, useLogoutUserMutation } from "@/core/api/frappeApi";
 import { generateBreadcrumb } from "@/core/utils/breadcrumb";
@@ -68,7 +69,6 @@ export function AppShell({
     .filter(Boolean)
     .map((item) => ({ title: item }));
   const userName = me?.full_name || me?.first_name || me?.email || me?.user_id || "User";
-  const userInitial = userName.charAt(0).toUpperCase();
   const modules = useMemo<AppShellModule[]>(
     () => [
       {
@@ -210,8 +210,7 @@ export function AppShell({
           </div>
 
           <div
-            className="brand-copy"
-            style={{ display: collapsed && !isMobile ? "none" : undefined }}
+            className={`brand-copy ${collapsed && !isMobile ? "brand-copy-hidden" : ""}`}
           >
             <Title level={4} className="brand-title">
               Textile ERP
@@ -305,22 +304,22 @@ export function AppShell({
                   icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
                   onClick={() => setCollapsed((prev) => !prev)}
                 />
-                <Text className="header-title">{title}</Text>
+                <div className="header-title-block">
+                  {breadcrumbItems?.length ? (
+                    <Breadcrumb
+                      className="header-breadcrumb"
+                      separator={<CaretRightFilled className="header-breadcrumb-separator" />}
+                      items={breadcrumbItems}
+                    />
+                  ) : null}
+                  <Text className="header-title">{title}</Text>
+                  {subtitle ? <div className="header-subtitle">{subtitle}</div> : null}
+                </div>
               </div>
-              {breadcrumbItems?.length ? (
-                <Breadcrumb
-                  className="header-breadcrumb"
-                  separator={<CaretRightFilled className="header-breadcrumb-separator" />}
-                  items={breadcrumbItems}
-                />
-              ) : null}
-              {!collapsed && subtitle ? <div className="header-subtitle">{subtitle}</div> : null}
             </div>
             <div className="app-header-actions">
               <div className="app-header-profile">
-                <Avatar size={32} className="app-header-avatar">
-                  {userInitial}
-                </Avatar>
+                <Avatar size={32} className="app-header-avatar" icon={<UserOutlined />} />
                 {!isMobile ? <Text className="app-header-profile-name">{userName}</Text> : null}
               </div>
               <Button

@@ -26,6 +26,17 @@ import type { ItemShortageRow, MonthlyTrendPoint } from "@/modules/stock/types";
 import { ChartCard } from "./chart-card";
 import { DashboardCard } from "./dashboard-card";
 import { WarehouseStockTrendChart } from "./warehouse-stock-trend-chart";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 
 const { Text } = Typography;
 
@@ -44,33 +55,6 @@ const chartEmptyText = "No data available yet. Data will appear once transaction
 
 const formatCompactNumber = (value: number) => compactNumberFormatter.format(value || 0);
 
-const buildLinePath = (points: number[], width: number, height: number) => {
-  if (points.length === 0) {
-    return "";
-  }
-
-  const maxValue = Math.max(...points, 0);
-  const safeMax = maxValue > 0 ? maxValue : 1;
-  const stepX = points.length > 1 ? width / (points.length - 1) : width;
-
-  return points
-    .map((point, index) => {
-      const x = index * stepX;
-      const y = height - (point / safeMax) * (height - 24) - 12;
-      return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
-};
-
-const buildAreaPath = (points: number[], width: number, height: number) => {
-  if (points.length === 0) {
-    return "";
-  }
-
-  const line = buildLinePath(points, width, height);
-  return `${line} L ${width} ${height} L 0 ${height} Z`;
-};
-
 function TrendChart({
   data,
   tone,
@@ -80,39 +64,70 @@ function TrendChart({
   tone: "blue" | "green";
   formatter: (value: number) => string;
 }) {
-  const width = 620;
-  const height = 210;
-  const values = data.map((entry) => entry.value);
-  const linePath = buildLinePath(values, width, height);
-  const areaPath = buildAreaPath(values, width, height);
   const stroke = tone === "blue" ? "#1677ff" : "#52c41a";
-  const fill = tone === "blue" ? "url(#stockAreaBlue)" : "url(#stockAreaGreen)";
 
   return (
     <div className="stock-trend-chart-shell">
       <div className="stock-trend-chart-canvas">
-        <svg viewBox={`0 0 ${width} ${height}`} className="stock-trend-chart-svg" preserveAspectRatio="none" aria-hidden="true">
-          <defs>
-            <linearGradient id="stockAreaBlue" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#69b1ff" stopOpacity="0.42" />
-              <stop offset="100%" stopColor="#e6f4ff" stopOpacity="0.04" />
-            </linearGradient>
-            <linearGradient id="stockAreaGreen" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#95de64" stopOpacity="0.38" />
-              <stop offset="100%" stopColor="#f6ffed" stopOpacity="0.04" />
-            </linearGradient>
-          </defs>
-          <path d={areaPath} fill={fill} />
-          <path d={linePath} fill="none" stroke={stroke} strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 12, right: 10, left: -18, bottom: 8 }}>
+            <CartesianGrid stroke="#e8edf5" strokeDasharray="4 4" vertical={false} />
+            <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#64748b" }} />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 12, fill: "#64748b" }}
+              tickFormatter={formatter}
+              width={74}
+            />
+            <RechartsTooltip
+              formatter={(value: unknown) => formatter(Number(value ?? 0))}
+              contentStyle={{ borderRadius: 10, border: "1px solid #e5ebf3" }}
+            />
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke={stroke}
+              strokeWidth={3}
+              dot={false}
+              activeDot={{ r: 4, strokeWidth: 0 }}
+              strokeLinecap="round"
+            />
+          </LineChart>
+        </ResponsiveContainer>
       </div>
-      <div className="stock-trend-chart-footer">
-        {data.slice(-6).map((entry) => (
-          <div key={entry.month} className="stock-trend-chart-point">
-            <Text className="stock-trend-chart-month">{entry.month}</Text>
-            <Text strong>{formatter(entry.value)}</Text>
-          </div>
-        ))}
+    </div>
+  );
+}
+
+function PurchaseTrendBarChart({
+  data,
+  formatter
+}: {
+  data: MonthlyTrendPoint[];
+  formatter: (value: number) => string;
+}) {
+  return (
+    <div className="stock-trend-chart-shell">
+      <div className="stock-trend-chart-canvas">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={data} margin={{ top: 10, right: 10, left: -18, bottom: 8 }}>
+            <CartesianGrid stroke="#e8edf5" strokeDasharray="4 4" vertical={false} />
+            <XAxis dataKey="month" tickLine={false} axisLine={false} tick={{ fontSize: 12, fill: "#64748b" }} />
+            <YAxis
+              tickLine={false}
+              axisLine={false}
+              tick={{ fontSize: 12, fill: "#64748b" }}
+              tickFormatter={formatter}
+              width={74}
+            />
+            <RechartsTooltip
+              formatter={(value: unknown) => formatter(Number(value ?? 0))}
+              contentStyle={{ borderRadius: 10, border: "1px solid #e5ebf3" }}
+            />
+            <Bar dataKey="value" fill="#52c41a" radius={[6, 6, 0, 0]} maxBarSize={28} />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </div>
   );
@@ -290,9 +305,8 @@ export function StockDashboardPage() {
             emptyText={chartEmptyText}
             extra={<Text type="secondary">Monthly inbound value</Text>}
           >
-            <TrendChart
+            <PurchaseTrendBarChart
               data={dashboard?.purchaseReceiptTrends ?? []}
-              tone="green"
               formatter={(value) => formatCompactNumber(value)}
             />
           </ChartCard>

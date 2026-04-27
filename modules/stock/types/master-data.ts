@@ -21,6 +21,9 @@ export type ItemMasterRow = {
   item_name?: string | null;
   item_group?: string | null;
   stock_uom?: string | null;
+  variant_of?: string | null;
+  has_variants?: 0 | 1;
+  has_batch_no?: 0 | 1;
   disabled?: 0 | 1;
   modified?: string | null;
 };

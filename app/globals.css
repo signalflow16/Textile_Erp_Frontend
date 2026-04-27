@@ -1,7 +1,9 @@
 :root {
   color-scheme: light;
-  --sidebar-width: 240px;
-  --sidebar-collapsed-width: 64px;
+  --sidebar-width: 272px;
+  --sidebar-collapsed-width: 76px;
+  --shell-divider-color: #d7dde7;
+  --shell-header-height: 88px;
 }
 
 * {
@@ -43,9 +45,21 @@ a {
   height: 100vh;
   width: 100%;
   overflow: hidden;
+  position: relative;
   background:
     radial-gradient(circle at top left, rgba(37, 99, 235, 0.07), transparent 28%),
     linear-gradient(180deg, #f8fafc 0%, #f3f6fb 100%);
+}
+
+.app-container::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: var(--shell-header-height);
+  border-top: 1px solid var(--shell-divider-color);
+  pointer-events: none;
+  z-index: 11;
 }
 
 .app-sidebar {
@@ -53,19 +67,19 @@ a {
   min-width: var(--sidebar-width);
   height: 100vh;
   background: #ffffff;
-  border-right: 1px solid #f0f0f0;
-  transition: all 300ms ease;
+  border-right: 1px solid var(--shell-divider-color);
+  transition: width 300ms cubic-bezier(0.22, 1, 0.36, 1), min-width 300ms cubic-bezier(0.22, 1, 0.36, 1), transform 260ms ease;
   position: relative;
-
-  display: flex;              /* ✅ ADD */
-  flex-direction: column;     /* ✅ ADD */
+  will-change: width, min-width;
+  display: flex;
+  flex-direction: column;
 }
 
 .app-sider-scroll {
-  flex: 1;                 /* ✅ IMPORTANT */
+  flex: 1;
   overflow-y: auto;
   background: #ffffff;
-  padding: 0 10px 18px;
+  padding: 0 0 18px;
 }
 
 .app-sidebar-collapsed {
@@ -93,18 +107,19 @@ a {
 }
 
 .brand-panel {
-  position: sticky;   /* ✅ ADD */
-  top: 0;             /* ✅ ADD */
-  z-index: 10;        /* ✅ ADD */
-
-  background: #ffffff; /* ✅ IMPORTANT */
-  
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #ffffff;
   padding: 16px 8px 14px;
-  border-bottom: 1px solid #f0f0f0;
-  min-height: 88px;
+  border-bottom: 0;
+  box-sizing: border-box;
+  height: var(--shell-header-height);
+  min-height: var(--shell-header-height);
 
   display: flex;
   align-items: center;
+  transition: height 260ms cubic-bezier(0.22, 1, 0.36, 1), padding 260ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 .brand-row {
   display: flex;
@@ -114,6 +129,15 @@ a {
 
 .brand-copy {
   min-width: 0;
+  max-width: 180px;
+  opacity: 1;
+  overflow: hidden;
+  transition: max-width 220ms ease, opacity 220ms ease;
+}
+
+.brand-copy-hidden {
+  max-width: 0;
+  opacity: 0;
 }
 
 .brand-mark {
@@ -153,11 +177,13 @@ a {
 .app-header {
   z-index: 10;
   line-height: 1.4;
-  min-height: 88px;
+  box-sizing: border-box;
+  height: var(--shell-header-height);
+  min-height: var(--shell-header-height);
   width: 100%;
   padding: 16px 24px;
   background: #ffffff;
-  border-bottom: 1px solid #f0f0f0;
+  border-bottom: 0;
   animation: subtle-enter 240ms ease-out;
   display: flex;
   align-items: center;
@@ -247,9 +273,14 @@ a {
 
 .header-top-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  margin-bottom: 4px;
+}
+
+.header-title-block {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
 }
 
 .app-header-profile {
@@ -263,8 +294,9 @@ a {
 }
 
 .app-header-avatar {
-  background: #dbeafe !important;
-  color: #1d4ed8 !important;
+  background: #eff6ff !important;
+  color: #1e40af !important;
+  border: 1px solid #dbeafe;
 }
 
 .app-header-profile-name {
@@ -301,7 +333,7 @@ a {
 
 .header-title {
   font-size: 17px;
-  font-weight: 600;
+  font-weight: 700;
   color: #111827;
   line-height: 1.2;
 }
@@ -309,7 +341,7 @@ a {
 .header-breadcrumb.ant-breadcrumb {
   color: #8c8c8c;
   font-size: 12px;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .header-breadcrumb .ant-breadcrumb-link,
@@ -323,7 +355,7 @@ a {
 
 .header-subtitle {
   color: #595959;
-  margin-top: 0;
+  margin-top: 2px;
   font-size: 13px;
 }
 
@@ -1098,12 +1130,14 @@ a {
 
 .sidebar-nav {
   padding: 12px 10px 16px;
+  transition: opacity 220ms ease, transform 260ms ease;
 }
 
 .sidebar-module-list,
 .sidebar-icon-rail {
   display: grid;
   gap: 8px;
+  transition: opacity 220ms ease, transform 260ms ease;
 }
 
 .sidebar-module {
@@ -1114,7 +1148,7 @@ a {
   border-left: 0;
   border-radius: 0;
   background: transparent;
-  transition: all 300ms ease;
+  transition: background-color 220ms ease;
 }
 
 .sidebar-module.is-active {
@@ -1139,7 +1173,7 @@ a {
   color: #0f172a;
   font-weight: 600;
   border-radius: 12px;
-  transition: all 300ms ease;
+  transition: background-color 220ms ease, color 220ms ease;
 }
 
 .sidebar-module-toggle {
@@ -1177,6 +1211,7 @@ a {
   display: grid;
   gap: 4px;
   padding-left: 46px;
+  transition: opacity 220ms ease, max-height 260ms ease;
 }
 
 .sidebar-module-link {
@@ -1187,7 +1222,7 @@ a {
   border-radius: 12px;
   color: #475569;
   border-left: 0;
-  transition: all 300ms ease;
+  transition: background-color 220ms ease, color 220ms ease;
 }
 
 .sidebar-module-header:hover,
@@ -1236,7 +1271,7 @@ a {
 
 .master-filter-bar {
   display: grid;
-  grid-template-columns: minmax(240px, 1.5fr) minmax(220px, 1fr);
+  grid-template-columns: minmax(240px, 1.5fr) minmax(220px, 1fr) minmax(180px, 0.8fr);
   gap: 12px;
   align-items: center;
 }
@@ -1705,7 +1740,7 @@ a {
 }
 
 .warehouse-stock-trend-chart > div,
-.warehouse-stock-trend-chart canvas {
+.warehouse-stock-trend-chart svg {
   border-radius: 12px;
 }
 
@@ -1727,14 +1762,12 @@ a {
 
 .stock-trend-chart-shell {
   min-height: 300px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  gap: 18px;
+  display: block;
 }
 
 .stock-trend-chart-canvas {
-  min-height: 220px;
+  min-height: 236px;
+  height: 236px;
   border-radius: 12px;
   background:
     linear-gradient(180deg, rgba(245, 247, 250, 0.9) 0%, rgba(255, 255, 255, 0.98) 100%),
@@ -1745,33 +1778,7 @@ a {
       transparent 1px,
       transparent 52px
     );
-  padding: 10px;
-}
-
-.stock-trend-chart-svg {
-  width: 100%;
-  height: 220px;
-  display: block;
-}
-
-.stock-trend-chart-footer {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
-  gap: 12px;
-}
-
-.stock-trend-chart-point {
-  border-radius: 12px;
-  background: #f8fafc;
-  border: 1px solid #e5ebf3;
-  padding: 10px 12px;
-  display: grid;
-  gap: 4px;
-}
-
-.stock-trend-chart-month {
-  font-size: 12px;
-  color: #64748b;
+  padding: 6px 8px 4px;
 }
 
 .stock-detail-list.ant-list {

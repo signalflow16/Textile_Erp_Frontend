@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, type Key } from "react";
+import { useDeferredValue, useEffect, useMemo, useState, type Key } from "react";
 import { useRouter } from "next/navigation";
 import {
   App,
@@ -12,6 +12,7 @@ import {
   Form,
   Input,
   InputNumber,
+  Modal,
   Row,
   Select,
   Space,
@@ -24,13 +25,16 @@ import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 import type { ItemDocument } from "@/modules/stock/types/item";
 import {
   useCreateItemMutation,
+  useCreateItemAttributeMutation,
   useGetItemCodeAvailabilityQuery,
+  useGetItemAttributeOptionsQuery,
   useGetItemLookupsQuery,
   useGetItemPriceSummaryQuery,
   useGetItemVariantAttributeLookupsQuery,
   useUpdateItemMutation
 } from "@/core/api/frappeApi";
 import { getErrorMessage, normalizeItemPayload, type ItemFormValues } from "./item-master-helpers";
+import { isTemplateItem, isVariantItem } from "@/modules/shared/variants/variant-utils";
 
 const { Text, Title } = Typography;
 
@@ -65,10 +69,14 @@ const getFormListItemProps = <T extends { key: Key }>(field: T): Omit<T, "key"> 
 
 export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
   const [form] = Form.useForm<ItemFormValues>();
+  const [attributeForm] = Form.useForm<{ attribute_name: string; values: string[] }>();
   const router = useRouter();
   const { message } = App.useApp();
+  const [attributeModalOpen, setAttributeModalOpen] = useState(false);
   const { data: lookups, isLoading: lookupsLoading } = useGetItemLookupsQuery();
+  const { data: itemAttributeOptions } = useGetItemAttributeOptionsQuery();
   const [createItem, createState] = useCreateItemMutation();
+  const [createItemAttribute, createItemAttributeState] = useCreateItemAttributeMutation();
   const [updateItem, updateState] = useUpdateItemMutation();
 
   useEffect(() => {
@@ -161,6 +169,7 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
   const { data: variantLookups } = useGetItemVariantAttributeLookupsQuery(templateItemCode, {
     skip: !templateItemCode
   });
+  const { data: globalVariantLookups } = useGetItemVariantAttributeLookupsQuery();
   const { data: priceSummary } = useGetItemPriceSummaryQuery(itemCode ?? "", {
     skip: mode !== "edit" || !itemCode
   });
@@ -171,6 +180,55 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
     }
   );
   const warehouseOptions = useMemo(() => lookups?.warehouses ?? [], [lookups?.warehouses]);
+  const templateCodeForVariantList = useMemo(() => {
+    if (mode !== "edit" || !itemCode) {
+      return null;
+    }
+    if (isTemplateItem(initialValues)) {
+      return itemCode;
+    }
+    if (isVariantItem(initialValues) && initialValues?.variant_of) {
+      return initialValues.variant_of;
+    }
+    return null;
+  }, [initialValues, itemCode, mode]);
+  const attributeOptions = useMemo(
+    () => {
+      const merged = [
+        ...(itemAttributeOptions ?? []),
+        ...(variantLookups?.item_attributes ?? []),
+        ...(globalVariantLookups?.item_attributes ?? []),
+        ...(lookups?.item_attributes ?? [])
+      ];
+      const seen = new Set<string>();
+      return merged.filter((entry) => {
+        if (!entry?.value || seen.has(entry.value)) {
+          return false;
+        }
+        seen.add(entry.value);
+        return true;
+      });
+    },
+    [globalVariantLookups?.item_attributes, itemAttributeOptions, lookups?.item_attributes, variantLookups?.item_attributes]
+  );
+
+  const handleCreateAttribute = async () => {
+    try {
+      const values = await attributeForm.validateFields();
+      await createItemAttribute({
+        attributeName: values.attribute_name,
+        values: values.values
+      }).unwrap();
+      message.success("Item attribute created. You can now select it in Variant Attributes.");
+      attributeForm.resetFields();
+      setAttributeModalOpen(false);
+    } catch (error) {
+      if (typeof error === "object" && error && "errorFields" in error) {
+        return;
+      }
+      message.error(getErrorMessage(error, "Unable to create item attribute."));
+    }
+  };
 
   useEffect(() => {
     if (mode !== "create" || !deferredItemCode.trim() || itemCodeAvailability?.exists) {
@@ -196,6 +254,22 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
       if (values.has_variants && values.variant_of?.trim()) {
         message.error("Template item cannot be marked as Variant Of another item.");
         return;
+      }
+
+      if (values.has_variants) {
+        const hasAtLeastOneAttribute = (values.attributes ?? []).some(
+          (row) => row.attribute?.trim() && row.attribute_value?.trim()
+        );
+        if (!hasAtLeastOneAttribute) {
+          form.setFields([
+            {
+              name: "attributes",
+              errors: ["At least one variant attribute row is required for template items."]
+            }
+          ]);
+          message.error("Add at least one variant attribute (Attribute + Value) before saving template.");
+          return;
+        }
       }
 
       if (mode === "create" && itemCodeAvailability?.exists) {
@@ -460,17 +534,28 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
             </Col>
             {variantMode ? (
               <Col xs={24}>
-                <Title level={5}>Variant Attributes</Title>
+                <Space align="center" style={{ width: "100%", justifyContent: "space-between", marginBottom: 8 }}>
+                  <Title level={5} style={{ marginBottom: 0 }}>Variant Attributes</Title>
+                  <Button onClick={() => setAttributeModalOpen(true)} icon={<PlusOutlined />}>
+                    New Attribute
+                  </Button>
+                </Space>
+                {!attributeOptions.length ? (
+                  <Alert
+                    type="info"
+                    showIcon
+                    style={{ marginBottom: 12 }}
+                    message="No item attributes found"
+                    description="Create attributes (for example Color, Size) before adding template variant rows."
+                  />
+                ) : null}
                 <Form.List name="attributes">
                   {(fields, { add, remove }) => (
                     <Space direction="vertical" size={12} style={{ width: "100%" }}>
                       {fields.map((field) => {
                         const itemProps = getFormListItemProps(field);
                         const attributeName = form.getFieldValue(["attributes", field.name, "attribute"]);
-                        const valueOptions =
-                          variantLookups?.item_attributes?.find((attribute) => attribute.value === attributeName)?.values ??
-                          lookups?.item_attributes?.find((attribute) => attribute.value === attributeName)?.values ??
-                          [];
+                        const valueOptions = attributeOptions.find((attribute) => attribute.value === attributeName)?.values ?? [];
 
                         return (
                           <Row gutter={12} key={field.key}>
@@ -481,7 +566,7 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
                                 name={[field.name, "attribute"]}
                                 rules={[{ required: true, message: "Attribute is required." }]}
                               >
-                                <Select options={lookups?.item_attributes ?? []} showSearch optionFilterProp="label" />
+                                <Select options={attributeOptions} showSearch optionFilterProp="label" />
                               </Form.Item>
                             </Col>
                             <Col xs={20} md={12}>
@@ -881,8 +966,31 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
               {initialValues?.item_name || initialValues?.item_code || "New Item"}
             </Title>
             <Text type="secondary">{mode === "edit" ? "ERPNext Stock" : "Create ERPNext Stock Item"}</Text>
+            {mode === "edit" ? (
+              <Space size={8} style={{ display: "flex", marginTop: 8 }}>
+                {isTemplateItem(initialValues) ? <Tag color="processing">Template</Tag> : null}
+                {isVariantItem(initialValues) ? <Tag color="purple">Variant</Tag> : null}
+                {initialValues?.has_batch_no ? <Tag color="gold">Batch Tracked</Tag> : null}
+              </Space>
+            ) : null}
           </div>
           <Space>
+            {mode === "edit" && templateCodeForVariantList ? (
+              <Button
+                size="middle"
+                onClick={() => router.push(`/stock/items?variantOf=${encodeURIComponent(templateCodeForVariantList)}&variantMode=variant`)}
+              >
+                View Variants
+              </Button>
+            ) : null}
+            {mode === "edit" && isVariantItem(initialValues) && initialValues?.variant_of ? (
+              <Button
+                size="middle"
+                onClick={() => router.push(`/stock/items/${encodeURIComponent(initialValues.variant_of as string)}`)}
+              >
+                View Template
+              </Button>
+            ) : null}
             {mode === "edit" && itemCode ? (
               <Button size="middle" onClick={() => router.push(`/stock/items/${encodeURIComponent(itemCode)}/prices`)}>
                 Manage Prices
@@ -909,6 +1017,38 @@ export function ItemForm({ mode, itemCode, initialValues }: ItemFormProps) {
 
         <Tabs className="erp-item-tabs" items={moduleTabs} />
       </Form>
+      <Modal
+        open={attributeModalOpen}
+        title="Create Item Attribute"
+        okText="Create Attribute"
+        onCancel={() => {
+          attributeForm.resetFields();
+          setAttributeModalOpen(false);
+        }}
+        onOk={handleCreateAttribute}
+        confirmLoading={createItemAttributeState.isLoading}
+      >
+        <Form form={attributeForm} layout="vertical" requiredMark={false}>
+          <Form.Item
+            label="Attribute Name"
+            name="attribute_name"
+            rules={[{ required: true, message: "Attribute name is required." }]}
+          >
+            <Input placeholder="Color" />
+          </Form.Item>
+          <Form.Item
+            label="Attribute Values"
+            name="values"
+            rules={[{ required: true, type: "array", min: 1, message: "Add at least one attribute value." }]}
+          >
+            <Select
+              mode="tags"
+              tokenSeparators={[","]}
+              placeholder="Type values and press Enter (e.g., Red, Blue, Green)"
+            />
+          </Form.Item>
+        </Form>
+      </Modal>
     </Card>
   );
 }

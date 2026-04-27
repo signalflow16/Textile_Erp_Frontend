@@ -27,6 +27,8 @@ import type { LookupOption } from "@/modules/stock/types/item";
 type FetchItemsArgs = {
   search?: string;
   itemGroup?: string;
+  variantOf?: string;
+  variantMode?: "all" | "template" | "variant";
   page?: number;
   pageSize?: number;
 };
@@ -99,12 +101,20 @@ const mapLookupOptions = <T extends Record<string, unknown>>(rows: T[], valueKey
   return options;
 };
 
-const buildFilters = ({ search, itemGroup }: FetchItemsArgs) => {
+const buildFilters = ({ search, itemGroup, variantOf, variantMode }: FetchItemsArgs) => {
   const filters: unknown[][] = [["disabled", "in", [0, 1]]];
   const orFilters: unknown[][] = [];
 
   if (itemGroup?.trim()) {
     filters.push(["item_group", "=", itemGroup.trim()]);
+  }
+
+  if (variantOf?.trim()) {
+    filters.push(["variant_of", "=", variantOf.trim()]);
+  } else if (variantMode === "template") {
+    filters.push(["has_variants", "=", 1]);
+  } else if (variantMode === "variant") {
+    filters.push(["variant_of", "!=", ""]);
   }
 
   if (search?.trim()) {
@@ -139,7 +149,7 @@ export const fetchItems = createAsyncThunk<
           url: masterDataEndpoints.item.list,
           method: "GET",
           params: buildPagedParams({
-            fields: ["name", "item_code", "item_name", "item_group", "stock_uom", "disabled", "modified"],
+            fields: ["name", "item_code", "item_name", "item_group", "stock_uom", "variant_of", "has_variants", "has_batch_no", "disabled", "modified"],
             filters,
             orFilters,
             orderBy: "modified desc",

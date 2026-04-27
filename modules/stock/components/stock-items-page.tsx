@@ -1,6 +1,8 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { App, Button, Form, Input, Select, Space, Tag, Typography } from "antd";
 import type { ColumnsType } from "antd/es/table";
 
@@ -18,6 +20,7 @@ import {
 } from "@/modules/stock/store/itemsSlice";
 import { useAppDispatch, useAppSelector } from "@/core/store/hooks";
 import type { ItemCreateValues, ItemMasterRow } from "@/modules/stock/types/master-data";
+import { isTemplateItem, isVariantItem } from "@/modules/shared/variants/variant-utils";
 
 const { Text } = Typography;
 
@@ -30,6 +33,10 @@ export function StockItemsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [itemCodeValidating, setItemCodeValidating] = useState(false);
   const deferredSearch = useDeferredValue(searchText);
+  const searchParams = useSearchParams();
+  const variantOfParam = searchParams.get("variantOf") ?? undefined;
+  const initialVariantMode = (searchParams.get("variantMode") as "all" | "template" | "variant" | null) ?? "all";
+  const [variantMode, setVariantMode] = useState<"all" | "template" | "variant">(initialVariantMode);
 
   const items = useAppSelector(selectAllItems);
   const lookups = useAppSelector(selectItemLookups);
@@ -51,11 +58,13 @@ export function StockItemsPage() {
       fetchItems({
         search: deferredSearch,
         itemGroup,
+        variantOf: variantOfParam,
+        variantMode,
         page: itemsState.pagination.current,
         pageSize: itemsState.pagination.pageSize
       })
     );
-  }, [deferredSearch, dispatch, itemGroup, itemsState.pagination.current, itemsState.pagination.pageSize]);
+  }, [deferredSearch, dispatch, itemGroup, itemsState.pagination.current, itemsState.pagination.pageSize, variantMode, variantOfParam]);
 
   useEffect(() => {
     if (itemsState.pagination.current === 1) {
@@ -66,11 +75,13 @@ export function StockItemsPage() {
       fetchItems({
         search: deferredSearch,
         itemGroup,
+                variantOf: variantOfParam,
+                variantMode,
         page: 1,
         pageSize: itemsState.pagination.pageSize
       })
     );
-  }, [deferredSearch, dispatch, itemGroup, itemsState.pagination.current, itemsState.pagination.pageSize]);
+  }, [deferredSearch, dispatch, itemGroup, itemsState.pagination.current, itemsState.pagination.pageSize, variantMode, variantOfParam]);
 
   const columns = useMemo<ColumnsType<ItemMasterRow>>(
     () => [
@@ -80,8 +91,17 @@ export function StockItemsPage() {
         key: "item_name",
         render: (_value, record) => (
           <Space direction="vertical" size={2}>
-            <Text strong>{record.item_name || record.item_code}</Text>
-            <Text type="secondary">{record.item_code}</Text>
+            <Link href={`/stock/items/${encodeURIComponent(record.item_code)}`}>
+              <Text strong>{record.item_name || record.item_code}</Text>
+            </Link>
+            <Link href={`/stock/items/${encodeURIComponent(record.item_code)}`}>
+              <Text type="secondary">{record.item_code}</Text>
+            </Link>
+            <Space size={6}>
+              {isTemplateItem(record) ? <Tag color="processing">Template</Tag> : null}
+              {isVariantItem(record) ? <Tag color="purple">Variant</Tag> : null}
+              {record.has_batch_no ? <Tag color="gold">Batch</Tag> : null}
+            </Space>
           </Space>
         )
       },
@@ -95,6 +115,13 @@ export function StockItemsPage() {
         dataIndex: "stock_uom",
         key: "stock_uom",
         width: 110
+      },
+      {
+        title: "Parent Template",
+        dataIndex: "variant_of",
+        key: "variant_of",
+        width: 170,
+        render: (value) => (typeof value === "string" && value ? <Tag bordered={false}>{value}</Tag> : <Text type="secondary">-</Text>)
       },
       {
         title: "Status",
@@ -148,9 +175,15 @@ export function StockItemsPage() {
             Manage core stock items with standard Frappe resources and textile-friendly UI helpers.
           </Text>
         </div>
-        <Button type="primary" onClick={() => setModalOpen(true)}>
-          Create Item
-        </Button>
+        <Space>
+          <Link href="/stock/items/new?mode=template">
+            <Button type="primary">Create Template</Button>
+          </Link>
+          <Link href="/stock/items/new?mode=variant">
+            <Button>Create Variant</Button>
+          </Link>
+          <Button onClick={() => setModalOpen(true)}>Quick Create Item</Button>
+        </Space>
       </div>
 
       <div className="master-filter-bar">
@@ -167,6 +200,15 @@ export function StockItemsPage() {
           placeholder="Filter by item group"
           onChange={(value) => setItemGroup(value)}
         />
+        <Select
+          value={variantMode}
+          options={[
+            { label: "All Items", value: "all" },
+            { label: "Templates", value: "template" },
+            { label: "Variants", value: "variant" }
+          ]}
+          onChange={(value) => setVariantMode(value)}
+        />
       </div>
 
       <div className="master-summary-bar">
@@ -174,7 +216,9 @@ export function StockItemsPage() {
           <Tag color="processing" bordered={false}>
             {itemsState.pagination.total} items
           </Tag>
-          <Text type="secondary">Live stock item records from your ERP workspace.</Text>
+          <Text type="secondary">
+            {variantOfParam ? `Showing variants of ${variantOfParam}.` : "Live stock item records from your ERP workspace."}
+          </Text>
         </Space>
       </div>
 
@@ -196,6 +240,8 @@ export function StockItemsPage() {
               fetchItems({
                 search: deferredSearch,
                 itemGroup,
+                variantOf: variantOfParam,
+                variantMode,
                 page: pagination.current ?? 1,
                 pageSize: pagination.pageSize ?? 20
               })

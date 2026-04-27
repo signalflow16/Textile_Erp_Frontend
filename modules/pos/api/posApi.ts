@@ -386,10 +386,10 @@ export const posApi = frappeApi.injectEndpoints({
         // Some ERPNext sites do not expose optional fields like barcode/gst_hsn_code/standard_rate.
         // Try richest field sets first, then fall back to a safe minimal set.
         const fieldSets = [
-          ["name", "item_code", "item_name", "stock_uom", "standard_rate", "barcode", "variant_of", "gst_hsn_code"],
-          ["name", "item_code", "item_name", "stock_uom", "standard_rate", "variant_of", "gst_hsn_code"],
-          ["name", "item_code", "item_name", "stock_uom", "variant_of", "barcode"],
-          ["name", "item_code", "item_name", "stock_uom", "variant_of"]
+          ["name", "item_code", "item_name", "stock_uom", "standard_rate", "barcode", "variant_of", "has_variants", "has_batch_no", "color", "size", "design", "gst_hsn_code"],
+          ["name", "item_code", "item_name", "stock_uom", "standard_rate", "variant_of", "has_variants", "has_batch_no", "color", "size", "design", "gst_hsn_code"],
+          ["name", "item_code", "item_name", "stock_uom", "variant_of", "has_variants", "has_batch_no", "color", "size", "design", "barcode"],
+          ["name", "item_code", "item_name", "stock_uom", "variant_of", "has_variants", "has_batch_no", "color", "size", "design"]
         ];
 
         let finalResult: QueryResult | null = null;
@@ -421,16 +421,23 @@ export const posApi = frappeApi.injectEndpoints({
 
         const rows = (finalResult.data as FrappeListResponse<Record<string, unknown>>).data;
         return {
-          data: rows.map((row) => ({
-            label: String(row.item_name ?? row.item_code ?? row.name),
-            value: String(row.item_code ?? row.name),
-            item_name: typeof row.item_name === "string" ? row.item_name : undefined,
-            stock_uom: typeof row.stock_uom === "string" ? row.stock_uom : undefined,
-            standard_rate: toNumber(row.standard_rate),
-            barcode: typeof row.barcode === "string" ? row.barcode : undefined,
-            variant_of: typeof row.variant_of === "string" ? row.variant_of : undefined,
-            hs_code: itemHsCode(row)
-          }))
+          data: rows
+            .map((row) => ({
+              label: String(row.item_name ?? row.item_code ?? row.name),
+              value: String(row.item_code ?? row.name),
+              item_name: typeof row.item_name === "string" ? row.item_name : undefined,
+              stock_uom: typeof row.stock_uom === "string" ? row.stock_uom : undefined,
+              standard_rate: toNumber(row.standard_rate),
+              barcode: typeof row.barcode === "string" ? row.barcode : undefined,
+              variant_of: typeof row.variant_of === "string" ? row.variant_of : undefined,
+              has_variants: (toNumber(row.has_variants) ? 1 : 0) as 0 | 1,
+              has_batch_no: (toNumber(row.has_batch_no) ? 1 : 0) as 0 | 1,
+              color: toString(row.color),
+              size: toString(row.size),
+              design: toString(row.design),
+              hs_code: itemHsCode(row)
+            }))
+            .filter((row) => !(row.has_variants && !row.variant_of))
         };
       },
       providesTags: ["ItemList"]
@@ -458,6 +465,11 @@ export const posApi = frappeApi.injectEndpoints({
             standard_rate: toNumber(row.standard_rate),
             barcode: toString(row.barcode),
             variant_of: toString(row.variant_of),
+            has_variants: (toNumber(row.has_variants) ? 1 : 0) as 0 | 1,
+            has_batch_no: (toNumber(row.has_batch_no) ? 1 : 0) as 0 | 1,
+            color: toString(row.color),
+            size: toString(row.size),
+            design: toString(row.design),
             hs_code: itemHsCode(row)
           }
         };

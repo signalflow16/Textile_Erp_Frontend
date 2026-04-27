@@ -35,8 +35,15 @@ export type DocumentLineItem = {
   rate: number;
   amount: number;
   warehouse?: string;
+  batch_no?: string;
   source_warehouse?: string;
   target_warehouse?: string;
+  variant_of?: string;
+  has_variants?: 0 | 1;
+  has_batch_no?: 0 | 1;
+  color?: string | null;
+  size?: string | null;
+  design?: string | null;
   pricing_source?: string | null;
   manual_rate?: boolean;
   stock_uom?: string | null;

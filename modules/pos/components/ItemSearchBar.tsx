@@ -5,6 +5,7 @@ import { Button, Card, Input, InputNumber, Space, Table, Tag, Typography } from 
 import type { ColumnsType } from "antd/es/table";
 
 import type { PosItemLookup } from "@/modules/pos/types/pos";
+import { isTemplateItem, formatVariantDescriptor } from "@/modules/shared/variants/variant-utils";
 
 const { Text } = Typography;
 
@@ -42,7 +43,16 @@ export function ItemSearchBar({
         <Space direction="vertical" size={0}>
           <Text strong>{row.item_name ?? row.label}</Text>
           <Text type="secondary">{row.value}</Text>
-          {row.variant_of ? <Text type="secondary">Variant of: {row.variant_of}</Text> : null}
+          {row.variant_of ? (
+            <Text type="secondary">
+              Variant of: {row.variant_of}
+              {formatVariantDescriptor(row) ? ` (${formatVariantDescriptor(row)})` : ""}
+            </Text>
+          ) : null}
+          <Space size={6}>
+            {isTemplateItem(row) ? <Tag color="warning">Template</Tag> : null}
+            {row.has_batch_no ? <Tag color="gold">Batch</Tag> : null}
+          </Space>
         </Space>
       )
     },
@@ -72,8 +82,8 @@ export function ItemSearchBar({
       key: "action",
       width: 120,
       render: (_value, row) => (
-        <Button size="small" type="primary" onClick={() => onAddItem(row)}>
-          Add
+        <Button size="small" type="primary" disabled={isTemplateItem(row)} onClick={() => onAddItem(row)}>
+          {isTemplateItem(row) ? "Blocked" : "Add"}
         </Button>
       )
     }

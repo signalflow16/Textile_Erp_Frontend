@@ -139,7 +139,11 @@ export function PosBillingPage({ session, onRefreshSession }: { session?: PosSes
           onChangeRow={billing.updateCartItem}
           onRemoveRow={billing.removeCartItem}
           onApplyItem={async (rowId, itemCode) => {
-            await billing.applyItemCodeToRow(rowId, itemCode);
+            try {
+              await billing.applyItemCodeToRow(rowId, itemCode);
+            } catch (error) {
+              message.error(extractApiErrorMessage(error, "Unable to apply selected item."));
+            }
           }}
           onApplyBarcode={(rowId, barcode) => billing.applyBarcodeToRow(rowId, barcode)}
         />

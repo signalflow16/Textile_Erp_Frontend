@@ -19,6 +19,7 @@ import { openErpNextPrintPreview } from "@/modules/pos/utils/printBill";
 import { createEmptyPosRow, normalizePosRows, toBillableRows } from "@/modules/pos/utils/rowCompletion";
 import { validatePosBeforeSave, validatePosBeforeSubmit } from "@/modules/pos/utils/posValidation";
 import { createOrUpdatePosBillDraft, submitPosBill } from "@/modules/pos/utils/posSessionService";
+import { variantSelectionError } from "@/modules/shared/variants/variant-utils";
 
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -58,7 +59,8 @@ const buildNewCartItem = (item: PosItemLookup, warehouse?: string): PosCartItem 
   variant_of: item.variant_of,
   color: item.color,
   size: item.size,
-  design: item.design
+  design: item.design,
+  has_batch_no: item.has_batch_no ?? 0
 });
 
 export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
@@ -164,6 +166,15 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
   }, [fetchPosItemMeta]);
 
   const applyItemToRow = useCallback(async (rowId: string, item: PosItemLookup, options?: { incrementQtyOnly?: boolean }) => {
+    const selectionError = variantSelectionError({
+      item_code: item.value,
+      variant_of: item.variant_of,
+      has_variants: item.has_variants
+    });
+    if (selectionError) {
+      throw new Error(selectionError);
+    }
+
     const warehouse = form.set_warehouse;
     const [detail, stockQty, sellingRate] = await Promise.all([
       resolveItemMeta(item),
@@ -290,6 +301,11 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
           standard_rate: detail.standard_rate,
           barcode: detail.barcode,
           variant_of: detail.variant_of,
+          has_variants: detail.has_variants,
+          has_batch_no: detail.has_batch_no,
+          color: detail.color,
+          size: detail.size,
+          design: detail.design,
           hs_code: detail.hs_code
         }
       : null;
@@ -313,11 +329,15 @@ export const usePosBilling = ({ session }: { session?: PosSession | null }) => {
       return false;
     }
 
-    await applyItemToRow(rowId, {
-      ...matched,
-      barcode: token
-    }, { incrementQtyOnly: true });
-    return true;
+    try {
+      await applyItemToRow(rowId, {
+        ...matched,
+        barcode: token
+      }, { incrementQtyOnly: true });
+      return true;
+    } catch {
+      return false;
+    }
   }, [applyItemToRow, lookupItemByBarcode]);
 
   const updateCartItem = useCallback((rowId: string, patch: Partial<PosCartItem>) => {

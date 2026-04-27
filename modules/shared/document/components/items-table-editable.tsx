@@ -1,10 +1,11 @@
 "use client";
 
 import { useMemo } from "react";
-import { Button, InputNumber, Select, Space, Table, Typography } from "antd";
+import { Button, Input, InputNumber, Select, Space, Table, Typography } from "antd";
 import { DeleteOutlined, PlusOutlined } from "@ant-design/icons";
 
 import type { DocumentEngineConfig, DocumentLineItem, RowStockValidation } from "@/modules/shared/document/types/document-engine";
+import { formatVariantDescriptor, isTemplateItem } from "@/modules/shared/variants/variant-utils";
 
 const { Text } = Typography;
 
@@ -22,7 +23,16 @@ export function ItemsTableEditable({
   rows: DocumentLineItem[];
   validations: RowStockValidation[];
   lookups: {
-    items: Array<{ label: string; value: string }>;
+    items: Array<{
+      label: string;
+      value: string;
+      variant_of?: string | null;
+      has_variants?: 0 | 1;
+      has_batch_no?: 0 | 1;
+      color?: string | null;
+      size?: string | null;
+      design?: string | null;
+    }>;
     warehouses: Array<{ label: string; value: string }>;
     uoms: Array<{ label: string; value: string }>;
   };
@@ -35,6 +45,7 @@ export function ItemsTableEditable({
     () => new Map(validations.map((entry) => [entry.rowId, entry])),
     [validations]
   );
+  const itemOptionByCode = useMemo(() => new Map(lookups.items.map((entry) => [entry.value, entry])), [lookups.items]);
 
   return (
     <div className="document-items-shell">
@@ -66,7 +77,19 @@ export function ItemsTableEditable({
                 options={lookups.items}
                 value={row.item_code}
                 placeholder="Select item"
-                onChange={(value) => onRowChange(row.id, { item_code: value })}
+                onChange={(value) => {
+                  const selected = itemOptionByCode.get(value);
+                  onRowChange(row.id, {
+                    item_code: value,
+                    variant_of: selected?.variant_of ?? undefined,
+                    has_variants: selected?.has_variants ?? 0,
+                    has_batch_no: selected?.has_batch_no ?? 0,
+                    color: selected?.color ?? null,
+                    size: selected?.size ?? null,
+                    design: selected?.design ?? null,
+                    batch_no: selected?.has_batch_no ? row.batch_no : undefined
+                  });
+                }}
               />
             )
           },
@@ -140,12 +163,30 @@ export function ItemsTableEditable({
             render: (_value, row) => <Text>{row.amount.toFixed(2)}</Text>
           },
           {
+            title: "Batch",
+            width: 150,
+            render: (_value, row) => (
+              <Input
+                disabled={readonly || !row.has_batch_no}
+                value={row.batch_no}
+                placeholder={row.has_batch_no ? "Batch required" : "Not required"}
+                onChange={(event) => onRowChange(row.id, { batch_no: event.target.value })}
+              />
+            )
+          },
+          {
             title: "Stock",
             width: 200,
             render: (_value, row) => {
               const validation = validationMap.get(row.id);
+              const templateBlocked = isTemplateItem(row);
+              const batchMissing = Boolean(row.has_batch_no) && !row.batch_no;
+              const variantDescriptor = formatVariantDescriptor(row);
               return (
                 <Space direction="vertical" size={2}>
+                  {row.variant_of ? <Text type="secondary">Variant of {row.variant_of}{variantDescriptor ? ` (${variantDescriptor})` : ""}</Text> : null}
+                  {templateBlocked ? <Text type="danger">Template cannot be transacted.</Text> : null}
+                  {batchMissing ? <Text type="danger">Batch is required for this item.</Text> : null}
                   <Text type="secondary">Required {row.stock_qty.toFixed(2)}</Text>
                   {validation ? (
                     <Text type={validation.ok ? "secondary" : "danger"}>

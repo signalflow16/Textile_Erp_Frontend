@@ -322,6 +322,12 @@ export function BuyingDocumentForm({
           </div>
 
           <Card size="small" title="Items" style={{ marginTop: 8, marginBottom: 16 }}>
+            <Alert
+              type="info"
+              showIcon
+              style={{ marginBottom: 12 }}
+              message="Variant-only policy active. Template items are blocked in transactions."
+            />
             <BuyingItemRowsEditor
               itemOptions={masters.data?.items ?? []}
               uomOptions={masters.data?.uoms ?? []}
@@ -330,6 +336,7 @@ export function BuyingDocumentForm({
               withRate={kind === "supplier-quotation" || kind === "purchase-order" || kind === "purchase-invoice"}
               withBatch={kind === "purchase-receipt"}
               withRejectedQty={kind === "purchase-receipt"}
+              variantOnly
             />
           </Card>
 
